@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict"
-import { FOCUS_MODE_SETTING_KEYS, WRITER_SETTINGS } from "../src/profile/settingsCatalog"
+import { appliesOn, FOCUS_MODE_SETTING_KEYS, WRITER_SETTINGS } from "../src/profile/settingsCatalog"
 
 /**
  * The catalog is the only thing standing between a writer and a permanently
@@ -106,6 +106,44 @@ describe("settingsCatalog", () => {
 		// ever opens, and could not be undone by the restore command.
 		const styles = WRITER_SETTINGS.find((candidate) => candidate.key === "markdown.styles")
 		assert.deepEqual(styles?.value, ["./.writing/preview.css"])
+	})
+
+	it("hides its own machinery folders from the file list in the library", () => {
+		// A writer who opened VS Code's own file list saw `.vscode` and `.writing`
+		// sitting above their pieces.
+		const exclude = WRITER_SETTINGS.find((candidate) => candidate.key === "files.exclude")
+		assert.equal(exclude?.scope, "library")
+		const value = exclude?.value as Record<string, unknown>
+		assert.equal(value[".vscode"], true)
+		assert.equal(value[".writing"], true)
+	})
+
+	it("never hides a writer's pieces or their trash from the file list", () => {
+		const value = WRITER_SETTINGS.find((candidate) => candidate.key === "files.exclude")?.value as Record<
+			string,
+			unknown
+		>
+		for (const pattern of Object.keys(value)) {
+			assert.ok(!/\.md|Trash|Templates|\*\*\/\*$/.test(pattern), `${pattern} would hide the writer's own files`)
+		}
+	})
+
+	it("leaves out settings that do not exist on the platform", () => {
+		// macOS has no menu bar setting; writing it there is refused.
+		const menuBar = WRITER_SETTINGS.find((candidate) => candidate.key === "window.menuBarVisibility")
+		assert.ok(menuBar)
+		assert.equal(appliesOn(menuBar, "darwin"), false)
+		assert.equal(appliesOn(menuBar, "win32"), true)
+		assert.equal(appliesOn(menuBar, "linux"), true)
+	})
+
+	it("names only real platforms", () => {
+		const known = new Set(["darwin", "win32", "linux"])
+		for (const setting of WRITER_SETTINGS) {
+			for (const platform of setting.platforms ?? []) {
+				assert.ok(known.has(platform), `${setting.key}: ${platform}`)
+			}
+		}
 	})
 
 	it("keeps focus mode's temporary settings out of the permanent catalog", () => {

@@ -8,6 +8,7 @@ import {
 	toggleLinePrefix,
 	toggleNumberedList,
 	toggleWrapped,
+	toggleWrappedInLine,
 	underlines,
 } from "./formatting"
 import { strings } from "./strings"
@@ -87,8 +88,25 @@ export class Toolbar {
 					emptyInsertAt = selection.active
 				}
 
-				const text = editor.document.getText(range)
-				builder.replace(range, toggleWrapped(text, marker))
+				if (range.start.line !== range.end.line) {
+					builder.replace(range, toggleWrapped(editor.document.getText(range), marker))
+					continue
+				}
+
+				// Worked out against the whole line, because the word or selection
+				// may sit between markers that are not part of it: clicking in, or
+				// double-clicking, a bold word gives exactly that. Pressing the
+				// shortcut then takes the formatting off instead of adding more.
+				const line = editor.document.lineAt(range.start.line).text
+				const change = toggleWrappedInLine(line, range.start.character, range.end.character, marker)
+				builder.replace(
+					new vscode.Range(range.start.line, change.start, range.start.line, change.end),
+					change.text,
+				)
+				if (change.start !== range.start.character && selection.isEmpty && !wordRange) {
+					// An empty pair was taken away: there is nothing to type inside.
+					emptyInsertAt = undefined
+				}
 			}
 		})
 

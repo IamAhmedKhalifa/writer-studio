@@ -36,7 +36,8 @@ Press it again to come back.
 
 Every piece you write appears there, most recent first. The **+** button starts
 something new. Right-click any piece to rename it, make a copy, or move it to the
-trash.
+trash. Anything in the trash waits at the bottom of the list; right-click it to
+put it back.
 
 You can show and hide that list with **Cmd+Alt+B** (Ctrl+Alt+B on Windows and
 Linux).

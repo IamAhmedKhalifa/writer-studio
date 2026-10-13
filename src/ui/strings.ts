@@ -39,6 +39,9 @@ export const strings = {
 		lookRestoredPartly: (count: number) =>
 			`Most things are back to the way they were. ${count} ${count === 1 ? "setting" : "settings"} could not be changed back, so you can safely try again.`,
 		lookRestoreNothingToDo: "Nothing to undo \u2014 the writing look is not switched on.",
+		lookRestoreNeedsLibrary: "Everything else is back to normal. Your writing still has the writing look.",
+		lookRestoreNeedsLibraryDetail:
+			"Your writing is not open in this window, so its page layout could not be changed back from here. Open your writing to finish.",
 		lookNeedsLibrary:
 			"Let's open your writing first, so these changes apply to your writing and not to anything else you have open.",
 		lookNeedsLibraryOpen: "Open my writing",
@@ -61,9 +64,16 @@ export const strings = {
 		renameInvalid: "That name cannot be used. Please try letters, numbers, spaces, and dashes.",
 		renameTaken: "You already have a piece with that name.",
 		trashConfirm: (title: string) => `Move \u201c${title}\u201d to the trash?`,
-		trashConfirmDetail: "It will be moved to a Trash folder inside your writing, so you can get it back.",
+		trashConfirmDetail: "It will be kept in the Trash at the bottom of My Writing, so you can put it back.",
 		trashConfirmYes: "Move to trash",
-		trashed: (title: string) => `\u201c${title}\u201d was moved to the trash.`,
+		trashed: (title: string) =>
+			`\u201c${title}\u201d was moved to the trash. You can find it at the bottom of My Writing.`,
+		undo: "Undo",
+		trashGroup: "Trash",
+		trashCount: (count: number) => (count === 1 ? "1 piece" : `${count.toLocaleString()} pieces`),
+		trashTooltip: "Pieces you moved to the trash. Right-click one to put it back.",
+		trashedTooltip: "In the trash. Right-click to put it back.",
+		putBack: (title: string) => `\u201c${title}\u201d is back with the rest of your writing.`,
 		noLibraryYet: "Let's set up a place for your writing first.",
 		setUpNow: "Set it up",
 		lastEdited: (when: string) => `Last worked on ${when}`,
@@ -79,6 +89,8 @@ export const strings = {
 	focus: {
 		on: "Focus mode is on. Press it again to come back.",
 		off: "Focus mode is off.",
+		notFullyRestored:
+			"Focus mode is off, but the page could not be put fully back just now. It will be fixed the next time VS Code starts.",
 		statusOn: "Focus",
 		statusName: "Focus mode",
 		statusTooltip: "Turn focus mode on or off",

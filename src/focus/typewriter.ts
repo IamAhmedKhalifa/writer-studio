@@ -67,10 +67,11 @@ export class Typewriter {
 		})
 	}
 
-	async disable(): Promise<void> {
+	/** Returns false when something could not be put back; the record is kept. */
+	async disable(): Promise<boolean> {
 		const snapshot = this.context.globalState.get<FocusSnapshot>(SNAPSHOT_KEY)
 		if (!snapshot) {
-			return
+			return true
 		}
 
 		const config = vscode.workspace.getConfiguration()
@@ -87,6 +88,7 @@ export class Typewriter {
 		if (allRestored) {
 			await this.context.globalState.update(SNAPSHOT_KEY, undefined)
 		}
+		return allRestored
 	}
 
 	private async write(values: Record<FocusModeSettingKey, unknown>): Promise<void> {

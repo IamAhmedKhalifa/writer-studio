@@ -206,7 +206,7 @@ export class LibraryService {
 			candidates.map(([name]) => this.describe(vscode.Uri.joinPath(library, name), name)),
 		)
 
-		this.pruneCache(new Set(entries.map((entry) => entry.uri.fsPath)))
+		this.pruneCache(new Set(entries.map((entry) => entry.uri.fsPath)), library)
 		return [...entries].sort((a, b) => b.modified - a.modified)
 	}
 
@@ -279,10 +279,13 @@ export class LibraryService {
 		}
 	}
 
-	/** Forgets cache entries for pieces that are no longer in the library. */
-	private pruneCache(live: Set<string>): void {
+	/**
+	 * Forgets cache entries for pieces no longer in `directory`. Entries for other
+	 * folders, the trash among them, are left for their own listing to manage.
+	 */
+	private pruneCache(live: Set<string>, directory: vscode.Uri): void {
 		for (const key of this.describeCache.keys()) {
-			if (!live.has(key)) {
+			if (this.isSamePath(path.dirname(key), directory.fsPath) && !live.has(key)) {
 				this.describeCache.delete(key)
 			}
 		}
@@ -435,10 +438,10 @@ export class LibraryService {
 	 * Moves a piece into a Trash folder inside the library rather than deleting
 	 * it, so that "move to trash" is always reversible by the writer.
 	 */
-	async trashDocument(uri: vscode.Uri): Promise<void> {
+	async trashDocument(uri: vscode.Uri): Promise<vscode.Uri | undefined> {
 		const library = this.getLibraryUri()
 		if (!library) {
-			return
+			return undefined
 		}
 		const trash = vscode.Uri.joinPath(library, TRASH_DIRECTORY)
 		await vscode.workspace.fs.createDirectory(trash)
@@ -448,6 +451,57 @@ export class LibraryService {
 		const target = vscode.Uri.joinPath(trash, uniqueFileName(currentName, existing))
 		await vscode.workspace.fs.rename(uri, target, { overwrite: false })
 		this.announceChange()
+		return target
+	}
+
+	/**
+	 * The pieces in the trash, newest first.
+	 *
+	 * Listed in the sidebar because a trash nobody can find is not a way to get
+	 * anything back: a writer looked in the app, every menu, and the computer's
+	 * own bin, and found nothing.
+	 */
+	async listTrash(): Promise<DocumentEntry[]> {
+		const library = this.getLibraryUri()
+		if (!library) {
+			return []
+		}
+		const trash = vscode.Uri.joinPath(library, TRASH_DIRECTORY)
+		let children: [string, vscode.FileType][]
+		try {
+			children = await vscode.workspace.fs.readDirectory(trash)
+		} catch {
+			return []
+		}
+		const entries = await Promise.all(
+			children
+				.filter(([name, type]) => type === vscode.FileType.File && this.isDocument(name))
+				.map(([name]) => this.describe(vscode.Uri.joinPath(trash, name), name)),
+		)
+		this.pruneCache(new Set(entries.map((entry) => entry.uri.fsPath)), trash)
+		return entries.sort((a, b) => b.modified - a.modified)
+	}
+
+	/**
+	 * Moves a piece out of the trash and back among the others, under a new name
+	 * if one of the same name has been written since. Returns where it went, or
+	 * undefined when `uri` is not in this library's trash.
+	 */
+	async restoreFromTrash(uri: vscode.Uri): Promise<vscode.Uri | undefined> {
+		const library = this.getLibraryUri()
+		if (!library) {
+			return undefined
+		}
+		const trash = vscode.Uri.joinPath(library, TRASH_DIRECTORY)
+		if (!this.isSamePath(path.dirname(uri.fsPath), trash.fsPath) || !(await this.isInLibraryResolved(uri))) {
+			return undefined
+		}
+
+		const existing = await this.existingFileNames(library)
+		const target = vscode.Uri.joinPath(library, uniqueFileName(path.basename(uri.fsPath), existing))
+		await vscode.workspace.fs.rename(uri, target, { overwrite: false })
+		this.announceChange()
+		return target
 	}
 
 	/**
@@ -499,7 +553,11 @@ export class LibraryService {
 		if (!library) {
 			return
 		}
-		const pattern = new vscode.RelativePattern(library, "*.{md,markdown}")
+		// The trash too, so a piece moved there or back outside the app shows up.
+		const pattern = new vscode.RelativePattern(
+			library,
+			`{*.md,*.markdown,${TRASH_DIRECTORY}/*.md,${TRASH_DIRECTORY}/*.markdown}`,
+		)
 		this.watcher = vscode.workspace.createFileSystemWatcher(pattern)
 		this.watcher.onDidCreate(() => this.notifyChanged())
 		this.watcher.onDidDelete(() => this.notifyChanged())

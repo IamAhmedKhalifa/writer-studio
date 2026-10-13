@@ -107,6 +107,63 @@ function countRun(text: string, character: string, from: number, step: number): 
 }
 
 /**
+ * Whether the text the writer pointed at sits directly between a pair of
+ * `marker`, so pressing the shortcut again should take the formatting off.
+ *
+ * `before` is the text on the line up to the selection, `after` the text on the
+ * line from its end. Clicking in a bold word, or double-clicking it, selects the
+ * word without its asterisks; seen alone, the word is not wrapped, so Cmd+B used
+ * to add a second pair (`****word****`) instead of removing the first.
+ *
+ * Runs of the marker character are counted for the same reason as in
+ * `isWrapped`: an asterisk on each side of a word inside `**bold**` is half of a
+ * bold pair, not an italic one, and treating it as italic would quietly turn
+ * bold into italic. Uneven runs (`**word*`) are left alone, because adding
+ * markers can be undone and removing the wrong ones deletes the writer's text.
+ *
+ * `text` is what was selected. A marker inside it, other than against its
+ * edges, means the pair outside does not belong together: selecting
+ * `one* and *two` in `*one* and *two*` must not strip the outer asterisks.
+ */
+export function enclosedByMarker(before: string, text: string, after: string, marker: string): boolean {
+	const character = marker.charAt(0)
+	if (text.trim().length > 0 && !innerMarkersAreEdgeOnly(text, character)) {
+		return false
+	}
+	const runBefore = countRun(before, character, before.length - 1, -1)
+	const runAfter = countRun(after, character, 0, 1)
+
+	if (runBefore !== runAfter || runBefore < marker.length) {
+		return false
+	}
+	if (marker.length === 1) {
+		// Italic is present when a run is odd: `*`, or `***` for bold and italic.
+		return runBefore % 2 === 1
+	}
+	return true
+}
+
+/** A replacement within one line: characters `start` to `end` become `text`. */
+export interface LineEdit {
+	readonly start: number
+	readonly end: number
+	readonly text: string
+}
+
+/**
+ * What pressing Cmd+B or Cmd+I does to characters `start`–`end` of `line`: wrap
+ * them, unwrap them when the markers are inside the selection, or take away a
+ * pair sitting just outside it.
+ */
+export function toggleWrappedInLine(line: string, start: number, end: number, marker: string): LineEdit {
+	const text = line.slice(start, end)
+	if (!isWrapped(text.trim(), marker) && enclosedByMarker(line.slice(0, start), text, line.slice(end), marker)) {
+		return { start: start - marker.length, end: end + marker.length, text }
+	}
+	return { start, end, text: toggleWrapped(text, marker) }
+}
+
+/**
  * Adds a prefix to every line, or removes it from every line when all of them
  * already have it. Blank lines are left alone so a quotation does not grow
  * stray markers.

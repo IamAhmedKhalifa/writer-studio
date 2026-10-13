@@ -4,7 +4,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import * as vscode from "vscode"
 import type { InternalApi } from "../src/extension"
-import { FOCUS_MODE_SETTING_KEYS } from "../src/profile/settingsCatalog"
+import { FOCUS_MODE_SETTING_KEYS, WRITER_SETTINGS } from "../src/profile/settingsCatalog"
 
 const EXTENSION_ID = "ahmed-khalifa.writers-studio"
 
@@ -259,11 +259,79 @@ describe("Writer's Studio", () => {
 			assert.ok(await exists(trashed), "the piece should still be recoverable from the trash")
 		})
 
+		it("lists what is in the trash, and puts it back", async () => {
+			const created = await api.library.createDraft("Back Again")
+			assert.ok(created)
+			const trashed = await api.library.trashDocument(created)
+			assert.ok(trashed)
+
+			assert.ok((await api.library.listTrash()).some((entry) => entry.uri.fsPath === trashed.fsPath))
+			assert.ok(!(await api.library.listDocuments()).some((entry) => entry.uri.fsPath === created.fsPath))
+
+			const back = await api.library.restoreFromTrash(trashed)
+			assert.ok(back)
+			assert.equal(back.fsPath, created.fsPath, "it should return under its own name")
+			assert.ok(await exists(back))
+			assert.ok(!(await exists(trashed)))
+			assert.equal((await api.library.listTrash()).length, 0)
+		})
+
+		it("puts a piece back without writing over one with the same name", async () => {
+			const first = await api.library.createDraft("Twice")
+			assert.ok(first)
+			await vscode.workspace.fs.writeFile(first, new TextEncoder().encode("# Twice\n\nThe first.\n"))
+			const trashed = await api.library.trashDocument(first)
+			assert.ok(trashed)
+
+			const second = await api.library.createDraft("Twice")
+			assert.ok(second)
+			assert.equal(second.fsPath, first.fsPath, "the name was free again, so it is reused")
+
+			const back = await api.library.restoreFromTrash(trashed)
+			assert.ok(back)
+			assert.notEqual(back.fsPath, second.fsPath)
+			assert.equal(await readText(back), "# Twice\n\nThe first.\n")
+			assert.equal(await readText(second), "# Twice\n\n")
+		})
+
+		it("only ever puts back something that is in the trash", async () => {
+			const created = await api.library.createDraft("Not Trashed")
+			assert.ok(created)
+			assert.equal(await api.library.restoreFromTrash(created), undefined)
+			assert.ok(await exists(created))
+		})
+
 		it("knows which pieces belong to it", async () => {
 			const created = await api.library.createDraft("Mine")
 			assert.ok(created)
 			assert.ok(api.library.isInLibrary(created))
 			assert.ok(!api.library.isInLibrary(vscode.Uri.file(path.join(os.tmpdir(), "somewhere-else.md"))))
+		})
+	})
+
+	describe("the settings catalog", () => {
+		it("never puts in the writing folder a setting that cannot live in a folder", () => {
+			// VS Code refuses a folder-level write of a setting declared
+			// application- or machine-wide. This one slipped through for the spell
+			// checker's delay, so its 50 ms default kept underlining half-typed words.
+			const declared = new Map<string, string>()
+			for (const extension of vscode.extensions.all) {
+				const configuration = (extension.packageJSON as { contributes?: { configuration?: unknown } })
+					.contributes?.configuration
+				const sections = (Array.isArray(configuration) ? configuration : [configuration]) as {
+					properties?: Record<string, { scope?: string }>
+				}[]
+				for (const section of sections) {
+					for (const [key, spec] of Object.entries(section?.properties ?? {})) {
+						declared.set(key, spec.scope ?? "window")
+					}
+				}
+			}
+
+			const offenders = WRITER_SETTINGS.filter(
+				(setting) => setting.scope === "library" && ["application", "machine"].includes(declared.get(setting.key) ?? ""),
+			).map((setting) => `${setting.key} (${declared.get(setting.key)})`)
+			assert.deepEqual(offenders, [])
 		})
 	})
 
@@ -293,6 +361,9 @@ describe("Writer's Studio", () => {
 
 			const applied = await api.profile.apply()
 			assert.ok(applied.applied > 0)
+			// Anything refused here is reported to the writer as a setting that
+			// "could not be changed", on every setup.
+			assert.deepEqual(applied.skipped, [])
 			assert.ok(api.profile.isApplied())
 			assert.equal(vscode.workspace.getConfiguration().get("editor.lineNumbers"), "off")
 			assert.equal(vscode.workspace.getConfiguration().get("files.autoSave"), "afterDelay")
@@ -422,6 +493,24 @@ describe("Writer's Studio", () => {
 			await api.focus.forgetStateForTests()
 
 			await api.focus.recover()
+			assertRestored(before)
+		})
+
+		it("survives being switched on and off quickly", async () => {
+			// The bug this guards: ten quick presses of the shortcut left the
+			// scrollbars hidden while focus mode believed itself off, because each
+			// press started before the last had finished writing its settings.
+			const before = focusSnapshot()
+
+			await Promise.all(Array.from({ length: 10 }, () => api.focus.toggle()))
+			assert.ok(!api.focus.isOn(), "an even number of presses should end with focus mode off")
+			assertRestored(before)
+
+			await Promise.all(Array.from({ length: 11 }, () => api.focus.toggle()))
+			assert.ok(api.focus.isOn(), "an odd number of presses should end with focus mode on")
+			assert.equal(vscode.workspace.getConfiguration().get("editor.scrollbar.vertical"), "hidden")
+
+			await api.focus.exit()
 			assertRestored(before)
 		})
 

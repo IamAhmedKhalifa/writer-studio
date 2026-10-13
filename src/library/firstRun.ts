@@ -14,6 +14,11 @@ interface PendingSetup {
 	applyLook: boolean
 	/** Open the welcome piece. */
 	openWelcome: boolean
+	/**
+	 * Finish undoing the writing look. Set when restore ran from a window that did
+	 * not have the writing open, so the writing folder's own part had to wait.
+	 */
+	restoreLook?: boolean
 }
 
 /**
@@ -55,6 +60,14 @@ export class FirstRun {
 			if (!this.context.globalState.get(SETUP_OFFERED_KEY)) {
 				await this.offerSetup()
 			}
+			return
+		}
+
+		// Set up, and this window is the writing: open on the list of pieces.
+		// VS Code otherwise brings back whichever sidebar was last showing, and
+		// its own file list is one stray click away at the top of the left bar.
+		if (this.library.isLibraryOpen()) {
+			await this.showLibraryList()
 			return
 		}
 
@@ -142,6 +155,10 @@ export class FirstRun {
 	}
 
 	private async finishSetup(pending: PendingSetup): Promise<void> {
+		if (pending.restoreLook) {
+			await this.restoreNormalLook()
+			return
+		}
 		if (pending.applyLook) {
 			await this.offerWritingLook()
 		}
@@ -209,11 +226,42 @@ export class FirstRun {
 			void vscode.window.showInformationMessage(strings.setup.lookRestoreNothingToDo)
 			return
 		}
-		if (result.failed.length > 0) {
-			void vscode.window.showWarningMessage(strings.setup.lookRestoredPartly(result.failed.length))
+		// The writing folder's own part can only be undone with it open. Offering
+		// to open it is pointless when it already is: what is waiting then belongs
+		// to a place the writer has since moved away from, and is reported below
+		// like any other setting that could not be changed back.
+		if (result.waiting > 0 && !this.library.isLibraryOpen() && this.library.getLibraryUri()) {
+			await this.offerToFinishRestoreInLibrary()
+			return
+		}
+		if (result.failed.length > 0 || result.waiting > 0) {
+			void vscode.window.showWarningMessage(
+				strings.setup.lookRestoredPartly(result.failed.length + result.waiting),
+			)
 			return
 		}
 		void vscode.window.showInformationMessage(strings.setup.lookRestored)
+	}
+
+	private async offerToFinishRestoreInLibrary(): Promise<void> {
+		const choice = await vscode.window.showInformationMessage(
+			strings.setup.lookRestoreNeedsLibrary,
+			{ modal: true, detail: strings.setup.lookRestoreNeedsLibraryDetail },
+			strings.setup.lookNeedsLibraryOpen,
+		)
+		if (choice !== strings.setup.lookNeedsLibraryOpen) {
+			// Nothing is lost by saying no: the record stays, and running restore
+			// again from the writing finishes the job.
+			return
+		}
+		await this.context.globalState.update(PENDING_SETUP_KEY, {
+			applyLook: false,
+			openWelcome: false,
+			restoreLook: true,
+		} satisfies PendingSetup)
+		if (!(await this.openLibraryRespectingWindow())) {
+			await this.context.globalState.update(PENDING_SETUP_KEY, undefined)
+		}
 	}
 
 	private async offerToReopenLibrary(): Promise<void> {
@@ -280,6 +328,22 @@ export class FirstRun {
 			await vscode.commands.executeCommand("writersStudio.library.focus")
 		} catch {
 			// The view may not be ready yet; the sidebar still works.
+		}
+	}
+
+	/**
+	 * Shows My Writing in the sidebar without taking the cursor off the page, so
+	 * a writer who reopens VS Code mid-sentence can keep typing.
+	 */
+	private async showLibraryList(): Promise<void> {
+		const wasOnThePage = vscode.window.activeTextEditor !== undefined
+		try {
+			await vscode.commands.executeCommand("workbench.view.extension.writersStudio")
+			if (wasOnThePage) {
+				await vscode.commands.executeCommand("workbench.action.focusActiveEditorGroup")
+			}
+		} catch {
+			// The sidebar may not be ready yet; it still works when clicked.
 		}
 	}
 

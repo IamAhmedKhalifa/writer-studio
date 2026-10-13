@@ -15,6 +15,8 @@ export class FocusMode {
 	private on = false
 	private centred = false
 	private inWritingContext = false
+	/** Tail of the changes waiting to run; see `serially`. */
+	private queue: Promise<void> = Promise.resolve()
 
 	private readonly typewriter: Typewriter
 	private readonly dimming = new ParagraphDimming()
@@ -66,11 +68,13 @@ export class FocusMode {
 	 * Undoes anything a previous session left behind after an unclean shutdown.
 	 * Runs on activation, before focus mode can be entered again.
 	 */
-	async recover(): Promise<void> {
-		await this.typewriter.recoverFromUncleanExit()
-		this.on = false
-		this.centred = false
-		this.refreshStatusItem()
+	recover(): Promise<void> {
+		return this.serially(async () => {
+			await this.typewriter.recoverFromUncleanExit()
+			this.on = false
+			this.centred = false
+			this.refreshStatusItem()
+		})
 	}
 
 	/**
@@ -78,24 +82,57 @@ export class FocusMode {
 	 * crash or a window reload does. Exists so the test suite can prove the
 	 * recovery path works.
 	 */
-	async forgetStateForTests(): Promise<void> {
-		this.on = false
-		this.centred = false
-		this.dimming.disable()
-		this.refreshStatusItem()
+	forgetStateForTests(): Promise<void> {
+		return this.serially(async () => {
+			this.on = false
+			this.centred = false
+			this.dimming.disable()
+			this.refreshStatusItem()
+		})
 	}
 
-	async toggle(): Promise<void> {
-		if (this.on) {
-			await this.exit()
-			void vscode.window.setStatusBarMessage(strings.focus.off, 2000)
-			return
-		}
-		await this.enter()
-		void vscode.window.setStatusBarMessage(strings.focus.on, 2000)
+	/**
+	 * Runs one change of state at a time, in the order they were asked for.
+	 *
+	 * Entering and leaving each take several awaited settings writes. Pressing the
+	 * shortcut quickly used to start a second change while the first was still
+	 * writing: the two interleaved, VS Code turned some writes away, and the
+	 * writer was left with hidden scrollbars while focus mode believed itself off.
+	 */
+	private serially<T>(step: () => Promise<T>): Promise<T> {
+		const run = this.queue.then(step, step)
+		this.queue = run.then(
+			() => undefined,
+			() => undefined,
+		)
+		return run
 	}
 
-	async enter(): Promise<void> {
+	toggle(): Promise<void> {
+		// Decided when this turn comes up, not when the key was pressed, so ten
+		// quick presses alternate cleanly and end where an even number should.
+		return this.serially(async () => {
+			if (this.on) {
+				const restored = await this.exitNow()
+				if (restored) {
+					void vscode.window.setStatusBarMessage(strings.focus.off, 2000)
+				}
+				return
+			}
+			await this.enterNow()
+			void vscode.window.setStatusBarMessage(strings.focus.on, 2000)
+		})
+	}
+
+	enter(): Promise<void> {
+		return this.serially(() => this.enterNow())
+	}
+
+	async exit(): Promise<void> {
+		await this.serially(() => this.exitNow())
+	}
+
+	private async enterNow(): Promise<void> {
 		if (this.on) {
 			return
 		}
@@ -114,14 +151,15 @@ export class FocusMode {
 		this.refreshStatusItem()
 	}
 
-	async exit(): Promise<void> {
+	/** Returns false when the screen could not be fully put back. */
+	private async exitNow(): Promise<boolean> {
 		if (!this.on) {
-			return
+			return true
 		}
 		this.on = false
 
 		this.dimming.disable()
-		await this.typewriter.disable()
+		const restored = await this.typewriter.disable()
 
 		if (this.centred) {
 			await this.runCommand("workbench.action.toggleCenteredLayout")
@@ -129,6 +167,13 @@ export class FocusMode {
 		}
 
 		this.refreshStatusItem()
+
+		if (!restored) {
+			// The record is kept, so the next start finishes the job; the writer
+			// is told rather than left wondering where their scrollbars went.
+			void vscode.window.showWarningMessage(strings.focus.notFullyRestored)
+		}
+		return restored
 	}
 
 	/**

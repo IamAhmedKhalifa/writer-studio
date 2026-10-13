@@ -3,6 +3,7 @@ import {
 	buildLink,
 	buildTable,
 	currentHeadingLevel,
+	enclosedByMarker,
 	isWrapped,
 	normaliseUrl,
 	setHeadingLevel,
@@ -10,6 +11,7 @@ import {
 	toggleLinePrefix,
 	toggleNumberedList,
 	toggleWrapped,
+	toggleWrappedInLine,
 	underlines,
 } from "../src/ui/formatting"
 
@@ -283,6 +285,86 @@ describe("formatting", () => {
 		it("keeps the size sensible", () => {
 			assert.equal(buildTable(0, 0).split("\n")[0], "| Column 1 |")
 			assert.ok(buildTable(99, 99).split("\n").length <= 52)
+		})
+	})
+
+	describe("toggleWrappedInLine", () => {
+		/** Applies the change the way the editor would, marking the selection with [ ]. */
+		const press = (marked: string, marker: string): string => {
+			const start = marked.indexOf("[")
+			const end = marked.indexOf("]") - 1
+			const line = marked.replace("[", "").replace("]", "")
+			const change = toggleWrappedInLine(line, start, end, marker)
+			return line.slice(0, change.start) + change.text + line.slice(change.end)
+		}
+
+		it("takes bold off a word selected without its asterisks", () => {
+			// Clicking in a bold word, or double-clicking it, selects only the
+			// word. Cmd+B used to give "****word****" instead of removing bold.
+			assert.equal(press("a **[bold]** word", "**"), "a bold word")
+		})
+
+		it("takes italic off a word selected without its asterisks", () => {
+			assert.equal(press("an *[italic]* word", "*"), "an italic word")
+		})
+
+		it("takes the formatting off a phrase selected inside its markers", () => {
+			assert.equal(press("**[two words]**", "**"), "two words")
+		})
+
+		it("still adds bold to a plain word", () => {
+			assert.equal(press("a [plain] word", "**"), "a **plain** word")
+		})
+
+		it("still unwraps when the markers are part of the selection", () => {
+			assert.equal(press("a [**bold**] word", "**"), "a bold word")
+		})
+
+		it("adds italic inside bold instead of turning bold into italic", () => {
+			// One asterisk each side of a word in "**bold**" is half of the bold
+			// pair, not an italic one.
+			assert.equal(press("**[bold]**", "*"), "***bold***")
+		})
+
+		it("takes only italic off a word that is bold and italic", () => {
+			assert.equal(press("***[both]***", "*"), "**both**")
+		})
+
+		it("takes only bold off a word that is bold and italic", () => {
+			assert.equal(press("***[both]***", "**"), "*both*")
+		})
+
+		it("takes italic off bold text selected with its own markers", () => {
+			assert.equal(press("*[**word**]*", "*"), "**word**")
+		})
+
+		it("does not strip markers belonging to two different phrases", () => {
+			// Selecting "one* and *two" in "*one* and *two*" must not produce
+			// "one* and *two".
+			assert.equal(press("*[one* and *two]*", "*"), "**one* and *two**")
+		})
+
+		it("leaves uneven markers alone and wraps instead", () => {
+			assert.equal(press("**[word]*", "**"), "****word***")
+		})
+
+		it("takes away an empty pair left by pressing the shortcut twice", () => {
+			assert.equal(press("a **[]** b", "**"), "a  b")
+		})
+
+		it("italic on the second of two italic words leaves the first alone", () => {
+			assert.equal(press("*one* and *[two]*", "*"), "*one* and two")
+		})
+	})
+
+	describe("enclosedByMarker", () => {
+		it("needs the same number of markers on both sides", () => {
+			assert.equal(enclosedByMarker("**", "word", "*", "**"), false)
+			assert.equal(enclosedByMarker("**", "word", "**", "**"), true)
+		})
+
+		it("needs a marker against the text, not elsewhere on the line", () => {
+			assert.equal(enclosedByMarker("** ", "word", " **", "**"), false)
 		})
 	})
 })

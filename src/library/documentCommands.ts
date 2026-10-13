@@ -143,9 +143,48 @@ export class DocumentCommands {
 		// has moved out from under them.
 		await this.closeIfOpen(target)
 
+		let trashed: vscode.Uri | undefined
 		try {
-			await this.library.trashDocument(target)
-			void vscode.window.showInformationMessage(strings.library.trashed(title))
+			trashed = await this.library.trashDocument(target)
+		} catch {
+			void vscode.window.showErrorMessage(strings.errors.couldNotWrite)
+			return
+		}
+		if (!trashed) {
+			return
+		}
+
+		// Not awaited: the message stays up for as long as the writer leaves it,
+		// and the command should not wait on it.
+		const putBackFrom = trashed
+		void vscode.window
+			.showInformationMessage(strings.library.trashed(title), strings.library.undo)
+			.then(async (choice) => {
+				if (choice === strings.library.undo) {
+					await this.putBackAndOpen(putBackFrom, title)
+				}
+			})
+	}
+
+	/** Takes a piece out of the trash, from its right-click menu. */
+	async putBack(item?: DocumentTreeItem): Promise<void> {
+		// Only ever from the list, where the item says which trashed piece is meant.
+		if (!item?.trashed) {
+			return
+		}
+		await this.closeIfOpen(item.entry.uri)
+		await this.putBackAndOpen(item.entry.uri, item.entry.title)
+	}
+
+	private async putBackAndOpen(trashed: vscode.Uri, title: string): Promise<void> {
+		try {
+			const restored = await this.library.restoreFromTrash(trashed)
+			if (!restored) {
+				void vscode.window.showErrorMessage(strings.errors.couldNotWrite)
+				return
+			}
+			await this.open(restored)
+			void vscode.window.showInformationMessage(strings.library.putBack(title))
 		} catch {
 			void vscode.window.showErrorMessage(strings.errors.couldNotWrite)
 		}

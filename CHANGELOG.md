@@ -19,7 +19,9 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
 - **One list of everything you have written.** The sidebar shows your pieces
   newest first, titled by their own heading rather than by a file name.
   Right-click any piece to rename it, duplicate it, or move it to the trash.
-  The trash is a folder inside your writing, so nothing is ever deleted outright.
+  The trash is a folder inside your writing, so nothing is ever deleted outright;
+  it is listed at the bottom of the sidebar, where right-clicking a piece puts it
+  back.
 - **A writing look.** One click hides the parts of the window built for
   programmers and switches to a calm page in a serif typeface, in one of two
   themes: **Paper** for daylight and **Night** for late sessions.

@@ -15,7 +15,9 @@
  *     person who also uses VS Code for code keeps Git, problems, and their window
  *     title everywhere else.
  *   - `scope: "everywhere"` is reserved for the things that must follow the writer
- *     between windows, chiefly the theme and the editor's typography.
+ *     between windows, chiefly the theme and the editor's typography, and for
+ *     settings their owner declares application- or machine-wide, which VS Code
+ *     refuses to store in a folder at all.
  *
  * Nothing here may disable a security feature. Workspace Trust is deliberately
  * absent: hiding a prompt is not worth removing the protection that stops a
@@ -24,7 +26,7 @@
 
 export type SettingScope = "everywhere" | "library"
 
-interface SettingSpec {
+export interface SettingSpec {
 	readonly key: string
 	readonly value: unknown
 	readonly scope: SettingScope
@@ -34,6 +36,17 @@ interface SettingSpec {
 	 * their own entries.
 	 */
 	readonly merge?: boolean
+	/**
+	 * Where VS Code has the setting at all. Writing one it does not register on
+	 * this platform is refused, and was reported to every Mac writer as a
+	 * setting that "could not be changed". Absent means everywhere.
+	 */
+	readonly platforms?: readonly NodeJS.Platform[]
+}
+
+/** Whether `setting` exists on `platform`, so applying it can succeed. */
+export function appliesOn(setting: SettingSpec, platform: NodeJS.Platform = process.platform): boolean {
+	return setting.platforms === undefined || setting.platforms.includes(platform)
 }
 
 /** Serif stack that resolves on macOS, Windows, and Linux without downloads. */
@@ -112,7 +125,8 @@ export const WRITER_SETTINGS: readonly SettingSpec[] = [
 	{ key: "workbench.tips.enabled", value: false, scope: "everywhere" },
 	{ key: "workbench.statusBar.visible", value: true, scope: "everywhere" },
 	{ key: "window.commandCenter", value: false, scope: "everywhere" },
-	{ key: "window.menuBarVisibility", value: "compact", scope: "everywhere" },
+	// macOS keeps its menu bar at the top of the screen and has no such setting.
+	{ key: "window.menuBarVisibility", value: "compact", scope: "everywhere", platforms: ["win32", "linux"] },
 	// Window title and Git belong to the library: a writer who also codes must
 	// keep both in their other projects.
 	{ key: "window.title", value: "${activeEditorShort}", scope: "library" },
@@ -124,7 +138,14 @@ export const WRITER_SETTINGS: readonly SettingSpec[] = [
 	// Two trailing spaces mean "line break" in Markdown. Never strip them.
 	{ key: "files.trimTrailingWhitespace", value: false, scope: "library" },
 	{ key: "files.insertFinalNewline", value: true, scope: "library" },
-	{ key: "files.exclude", value: { "**/.DS_Store": true, "**/Thumbs.db": true }, scope: "library", merge: true },
+	// The two dot folders hold this app's own machinery. Left visible, VS Code's
+	// file list showed a writer `.vscode` and `.writing` above their pieces.
+	{
+		key: "files.exclude",
+		value: { "**/.DS_Store": true, "**/Thumbs.db": true, ".vscode": true, ".writing": true },
+		scope: "library",
+		merge: true,
+	},
 
 	// ---- Silence everything built for programmers, in the library only ------
 	{ key: "git.enabled", value: false, scope: "library" },
@@ -152,7 +173,11 @@ export const WRITER_SETTINGS: readonly SettingSpec[] = [
 		scope: "library",
 		merge: true,
 	},
-	{ key: "cSpell.spellCheckDelayMs", value: 500, scope: "library" },
+	// The spell checker declares this one application-wide, so it cannot live in
+	// the library: a folder-level write is refused, which used to leave the 50 ms
+	// default underlining half-typed words and every apply and restore reporting
+	// one setting it could not change.
+	{ key: "cSpell.spellCheckDelayMs", value: 500, scope: "everywhere" },
 	{ key: "cSpell.suggestionMenuType", value: "quickPick", scope: "everywhere" },
 	{ key: "cSpell.allowCompoundWords", value: false, scope: "library" },
 	{ key: "cSpell.showCommandsInEditorContextMenu", value: false, scope: "everywhere" },

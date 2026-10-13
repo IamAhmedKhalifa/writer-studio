@@ -102,6 +102,7 @@
 
     "notifications.background": "#1C1F23",
     "notifications.border": "#2E333A",
+    "notificationsInfoIcon.foreground": "#C4A177",
     "notificationCenterHeader.background": "#111317",
 
     "badge.background": "#2E343C",

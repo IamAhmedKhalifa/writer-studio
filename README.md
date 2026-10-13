@@ -51,7 +51,8 @@ has a heading changes that heading too, so the new name is what you see in the
 list and at the top of the page; a piece with no heading keeps its opening
 sentence as its label, because rewriting your first sentence would be worse than
 leaving it. Nothing is ever deleted outright: the trash is a folder inside your
-writing.
+writing, listed at the bottom of the sidebar, and right-clicking a piece there
+puts it back.
 
 **Focus mode.** The page moves to the middle of the window, every paragraph
 except the one you are writing fades, and the line you are typing on stays in a

@@ -144,6 +144,12 @@
         "category": "Writing"
       },
       {
+        "command": "writersStudio.putBackDocument",
+        "title": "Put back",
+        "category": "Writing",
+        "icon": "$(discard)"
+      },
+      {
         "command": "writersStudio.revealDocument",
         "title": "Show where this file is saved",
         "category": "Writing"
@@ -285,6 +291,16 @@
           "command": "writersStudio.revealDocument",
           "when": "view == writersStudio.library && viewItem == writersStudio.document",
           "group": "3_reveal@1"
+        },
+        {
+          "command": "writersStudio.putBackDocument",
+          "when": "view == writersStudio.library && viewItem == writersStudio.trashedDocument",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "writersStudio.putBackDocument",
+          "when": "view == writersStudio.library && viewItem == writersStudio.trashedDocument",
+          "group": "inline"
         }
       ],
       "editor/title": [
@@ -336,6 +352,10 @@
         },
         {
           "command": "writersStudio.trashDocument",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.putBackDocument",
           "when": "false"
         },
         {

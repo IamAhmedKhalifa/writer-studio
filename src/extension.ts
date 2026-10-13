@@ -30,7 +30,7 @@ export interface InternalApi {
 
 export async function activate(context: vscode.ExtensionContext): Promise<InternalApi> {
 	const library = new LibraryService(context)
-	const profile = new WriterProfile(context)
+	const profile = new WriterProfile(context, () => library.getLibraryUri())
 	const firstRun = new FirstRun(context, library, profile)
 	const documents = new DocumentCommands(library, firstRun)
 	const tree = new LibraryTreeProvider(library)
@@ -93,6 +93,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 	register("writersStudio.renameDocument", (item) => documents.rename(item))
 	register("writersStudio.duplicateDocument", (item) => documents.duplicate(item))
 	register("writersStudio.trashDocument", (item) => documents.trash(item))
+	register("writersStudio.putBackDocument", (item) => documents.putBack(item))
 	register("writersStudio.revealDocument", (item) => documents.reveal(item))
 
 	// ---- Writing -----------------------------------------------------------
