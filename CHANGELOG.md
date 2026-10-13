@@ -65,6 +65,8 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
 
 - VS Code does not let an extension hide the Command Palette, the menu bar, or
   some icons in the left-hand bar. They stay, quietly, and you never need them.
+  On Windows and Linux the menu bar folds into a single button; on a Mac it stays
+  in its usual place at the top of the screen, and Writer's Studio leaves it alone.
 - Cmd+B is Bold. Showing and hiding the sidebar moved to Cmd+Alt+B.
 - Where your system will not accept formatted text on the clipboard, copying
   falls back to the HTML itself, and the message tells you which happened.
