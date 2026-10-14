@@ -42,11 +42,51 @@ export interface SettingSpec {
 	 * setting that "could not be changed". Absent means everywhere.
 	 */
 	readonly platforms?: readonly NodeJS.Platform[]
+	/**
+	 * The optional companion extension that declares the setting. VS Code refuses
+	 * to write a setting nothing declares, so these are left alone while that
+	 * companion is not installed. Absent for VS Code's own settings and for those
+	 * of required companions.
+	 */
+	readonly owner?: string
+	/**
+	 * Added in a later VS Code than the oldest one Writer's Studio runs on, so it
+	 * is left alone where VS Code does not have it yet, rather than reported as a
+	 * setting that "could not be changed". The test suite checks that the current
+	 * VS Code has every one of these, so this cannot hide a misspelled key.
+	 */
+	readonly newerVSCodeOnly?: boolean
+	/**
+	 * Set from an answer the writer gave rather than fixed here: `value` is then
+	 * only the default, and the profile is told the real value when it applies
+	 * the look. Left alone entirely while there is no answer to use.
+	 */
+	readonly fromChoice?: WriterChoice
 }
 
-/** Whether `setting` exists on `platform`, so applying it can succeed. */
-export function appliesOn(setting: SettingSpec, platform: NodeJS.Platform = process.platform): boolean {
-	return setting.platforms === undefined || setting.platforms.includes(platform)
+/** Questions whose answers decide a setting's value. */
+export type WriterChoice = "spelling"
+
+/** The companion that adds Markdown editing helpers. Optional: see package.json. */
+export const MARKDOWN_HELPER_EXTENSION = "yzhang.markdown-all-in-one"
+
+/**
+ * Whether applying `setting` can succeed: VS Code has it on `platform`, its
+ * optional owner, if any, is installed, and a setting from a newer VS Code is
+ * known to this one.
+ */
+export function appliesOn(
+	setting: SettingSpec,
+	platform: NodeJS.Platform = process.platform,
+	isInstalled: (extensionId: string) => boolean = () => true,
+	isKnown: (key: string) => boolean = () => true,
+): boolean {
+	const onThisPlatform = setting.platforms === undefined || setting.platforms.includes(platform)
+	return (
+		onThisPlatform &&
+		(setting.owner === undefined || isInstalled(setting.owner)) &&
+		(!setting.newerVSCodeOnly || isKnown(setting.key))
+	)
 }
 
 /** Serif stack that resolves on macOS, Windows, and Linux without downloads. */
@@ -153,6 +193,11 @@ export const WRITER_SETTINGS: readonly SettingSpec[] = [
 	{ key: "scm.diffDecorations", value: "none", scope: "library" },
 	{ key: "problems.decorations.enabled", value: false, scope: "library" },
 	{ key: "extensions.ignoreRecommendations", value: true, scope: "library" },
+	// AI coding help filled the right-click menu with Fix, Explain, and Review,
+	// and put a Sign In button in the title bar. Off in the writing folder only,
+	// so a writer who also codes keeps it in their projects.
+	{ key: "chat.disableAIFeatures", value: true, scope: "library", newerVSCodeOnly: true },
+	{ key: "chat.titleBar.signIn.enabled", value: false, scope: "library", newerVSCodeOnly: true },
 
 	// ---- Reading and previewing --------------------------------------------
 	// The preview stylesheet is copied into the library and pointed at from here,
@@ -180,15 +225,29 @@ export const WRITER_SETTINGS: readonly SettingSpec[] = [
 	{ key: "cSpell.spellCheckDelayMs", value: 500, scope: "everywhere" },
 	{ key: "cSpell.suggestionMenuType", value: "quickPick", scope: "everywhere" },
 	{ key: "cSpell.allowCompoundWords", value: false, scope: "library" },
+	// British or American, as the writer answered. The writing folder only, so
+	// their code projects keep whatever the spell checker uses there.
+	{ key: "cSpell.language", value: "en", scope: "library", fromChoice: "spelling" },
 	{ key: "cSpell.showCommandsInEditorContextMenu", value: false, scope: "everywhere" },
+	// Writer's Studio lists "Spelling Suggestions…" at the top of the right-click
+	// menu itself. The spell checker's own copy sat near the bottom, under the
+	// programming items, and would now be a second one.
+	{ key: "cSpell.showSuggestionsLinkInEditorContextMenu", value: false, scope: "library" },
 
 	// ---- Markdown editing helpers (Markdown All in One) --------------------
-	{ key: "markdown.extension.toc.levels", value: "2..3", scope: "library" },
-	{ key: "markdown.extension.bold.indicator", value: "**", scope: "library" },
-	{ key: "markdown.extension.italic.indicator", value: "*", scope: "library" },
-	{ key: "markdown.extension.orderedList.marker", value: "ordered", scope: "library" },
-	{ key: "markdown.extension.tableFormatter.enabled", value: true, scope: "library" },
-	{ key: "markdown.extension.preview.autoShowPreviewToSide", value: false, scope: "library" },
+	// An optional companion: a writer can remove it, and VS Code switches it off
+	// in a folder that is not trusted, so these apply only while it is there.
+	{ key: "markdown.extension.toc.levels", value: "2..3", scope: "library", owner: MARKDOWN_HELPER_EXTENSION },
+	{ key: "markdown.extension.bold.indicator", value: "**", scope: "library", owner: MARKDOWN_HELPER_EXTENSION },
+	{ key: "markdown.extension.italic.indicator", value: "*", scope: "library", owner: MARKDOWN_HELPER_EXTENSION },
+	{ key: "markdown.extension.orderedList.marker", value: "ordered", scope: "library", owner: MARKDOWN_HELPER_EXTENSION },
+	{ key: "markdown.extension.tableFormatter.enabled", value: true, scope: "library", owner: MARKDOWN_HELPER_EXTENSION },
+	{
+		key: "markdown.extension.preview.autoShowPreviewToSide",
+		value: false,
+		scope: "library",
+		owner: MARKDOWN_HELPER_EXTENSION,
+	},
 
 	// ---- Defaults that focus mode builds on --------------------------------
 	{ key: "zenMode.centerLayout", value: true, scope: "everywhere" },

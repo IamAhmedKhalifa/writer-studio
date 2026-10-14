@@ -65,6 +65,8 @@ Select a passage to count just that passage.
 
 **Spelling.** Misspelled words get an underline. Right-click for suggestions, or
 choose **Add this word to my dictionary** for names and words you use often.
+British or American: you are asked once, when you set up the writing look, and
+**Choose British or American spelling** changes it later.
 
 **Getting your work out.** Right-click and choose **Copy for pasting into a
 website**, then paste into WordPress, Ghost, Substack, Medium, or a word
@@ -106,8 +108,10 @@ if you also use VS Code for code, your other projects are untouched.
 - **VS Code will ask once whether you trust your writing folder.** Say yes — you
   made it. Writer's Studio deliberately does not switch that question off, because
   it is the protection that stops a folder downloaded from the internet running
-  code on your computer. If you say no, your writing still opens and still works,
-  but settings cannot be changed.
+  code on your computer. If you say no, your writing still opens, saves itself,
+  and counts its words, but the writing look and your own dictionary wait until
+  you say yes, and VS Code switches off the helpers that continue lists, tidy
+  tables, and make a list of contents.
 - **Cmd+B is Bold here, not the sidebar.** VS Code normally uses it to show and
   hide the sidebar; that moved to **Cmd+Alt+B**. Markdown All in One also binds
   Cmd+B to its own bold command, so whichever of the two answers, you get bold.
@@ -130,9 +134,12 @@ Two well-established extensions are installed alongside this one and do the work
 they are best at. You will not see their names while writing.
 
 - [Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker)
-  for spelling.
+  for spelling, with its
+  [British English](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker-british-english)
+  dictionary for writers who spell the British way.
 - [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one)
   for lists that continue themselves, tidy tables, and the list of contents.
+  This one is optional: if you remove it, everything else keeps working.
 
 ---
 
@@ -146,9 +153,13 @@ npm run bundle  # build dist/extension.js
 npm run package # build a .vsix
 ```
 
-Press <kbd>F5</kbd> to launch a development instance. The two companion
-extensions are declared in `extensionDependencies`, so install them in your own
-VS Code first or activation will fail.
+Press <kbd>F5</kbd> to launch a development instance. Code Spell Checker is
+declared in `extensionDependencies`, so install it in your own VS Code first or
+activation will fail. Markdown All in One is in `extensionPack` instead: it
+cannot run in a folder that is not trusted, and VS Code switches off everything
+that depends on an extension it has switched off, which used to leave the writer
+with plain VS Code. Its settings carry an `owner` in the catalog and are skipped
+while it is missing.
 
 **Where things live.** `src/library` owns where writing is kept and the sidebar;
 `src/profile` owns the writing look and is the only place allowed to write a

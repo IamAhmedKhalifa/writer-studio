@@ -10,6 +10,7 @@
  */
 
 import {
+	collectLinkDefinitions,
 	isRuleLine,
 	isTableDividerLine,
 	stripBlockPrefix,
@@ -31,11 +32,18 @@ export interface ProseStats {
  * One pass over the lines, rather than twenty passes over the whole string, so
  * this stays affordable on the typing path for a book-length document.
  */
-function toProse(markdown: string): string {
+function toProse(markdown: string, forCopying = false): string {
 	const text = stripFencedBlocks(stripFrontMatter(markdown.replace(/\r\n/g, "\n")))
+	const lines = text.split("\n")
 	const out: string[] = []
+	// Copying keeps what a reader of the pasted text needs: where links go and
+	// the numbers of a numbered list. Counting keeps neither, as neither is prose.
+	const inline = forCopying
+		? { keepImageAltText: false, keepLinkAddresses: true, linkDefinitions: collectLinkDefinitions(lines) }
+		: { keepImageAltText: false }
+	const block = { keepNumbers: forCopying }
 
-	for (const line of text.split("\n")) {
+	for (const line of lines) {
 		// Reference definitions are instructions, not prose.
 		if (/^[ \t]*\[[^\]]+\]:/.test(line)) {
 			out.push("")
@@ -48,7 +56,7 @@ function toProse(markdown: string): string {
 
 		// Table pipes are structure; the cell contents are prose.
 		const withoutPipes = line.includes("|") ? line.replace(/\|/g, " ") : line
-		out.push(stripInlineMarkup(stripBlockPrefix(withoutPipes), { keepImageAltText: false }))
+		out.push(stripInlineMarkup(stripBlockPrefix(withoutPipes, block), inline))
 	}
 
 	return out.join("\n")
@@ -108,9 +116,12 @@ function countParagraphs(prose: string): number {
 		.filter((block) => /[\p{L}\p{N}]/u.test(block)).length
 }
 
-/** Removes Markdown markers so text can be pasted somewhere plain. */
+/**
+ * Removes Markdown markers so text can be pasted somewhere plain, keeping list
+ * numbers and putting each link's address in brackets after its words.
+ */
 export function toPlainText(markdown: string): string {
-	return toProse(markdown)
+	return toProse(markdown, true)
 		.split("\n")
 		.map((line) => line.replace(/[ \t]+$/, ""))
 		.join("\n")

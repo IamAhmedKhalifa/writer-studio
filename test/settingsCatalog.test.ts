@@ -1,5 +1,10 @@
 import * as assert from "node:assert/strict"
-import { appliesOn, FOCUS_MODE_SETTING_KEYS, WRITER_SETTINGS } from "../src/profile/settingsCatalog"
+import {
+	appliesOn,
+	FOCUS_MODE_SETTING_KEYS,
+	MARKDOWN_HELPER_EXTENSION,
+	WRITER_SETTINGS,
+} from "../src/profile/settingsCatalog"
 
 /**
  * The catalog is the only thing standing between a writer and a permanently
@@ -135,6 +140,37 @@ describe("settingsCatalog", () => {
 		assert.equal(appliesOn(menuBar, "darwin"), false)
 		assert.equal(appliesOn(menuBar, "win32"), true)
 		assert.equal(appliesOn(menuBar, "linux"), true)
+	})
+
+	it("leaves out an optional companion's settings while it is not installed", () => {
+		// Writing a setting nothing declares is refused, and would be reported as
+		// one that "could not be changed".
+		const toc = WRITER_SETTINGS.find((candidate) => candidate.key === "markdown.extension.toc.levels")
+		assert.ok(toc)
+		assert.equal(appliesOn(toc, "darwin", () => false), false)
+		assert.equal(appliesOn(toc, "darwin", () => true), true)
+	})
+
+	it("names the owner of every setting from the optional Markdown companion", () => {
+		for (const setting of WRITER_SETTINGS) {
+			if (setting.key.startsWith("markdown.extension.")) {
+				assert.equal(setting.owner, MARKDOWN_HELPER_EXTENSION, `${setting.key} needs its owner`)
+			}
+		}
+	})
+
+	it("leaves out a setting from a newer VS Code where this one does not have it", () => {
+		const ai = WRITER_SETTINGS.find((candidate) => candidate.key === "chat.disableAIFeatures")
+		assert.ok(ai)
+		assert.equal(ai.scope, "library", "AI help must stay on in the writer's code projects")
+		assert.equal(appliesOn(ai, "darwin", () => true, () => false), false)
+		assert.equal(appliesOn(ai, "darwin", () => true, () => true), true)
+	})
+
+	it("never makes a setting of VS Code's own wait for a companion", () => {
+		const theme = WRITER_SETTINGS.find((candidate) => candidate.key === "workbench.colorTheme")
+		assert.ok(theme)
+		assert.equal(appliesOn(theme, "darwin", () => false), true)
 	})
 
 	it("names only real platforms", () => {

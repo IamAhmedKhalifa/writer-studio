@@ -32,10 +32,14 @@ mkdirSync(writingFolder, { recursive: true })
 
 const shared = {
 	version: "stable",
-	// The two companion extensions are declared as dependencies in package.json,
-	// so VS Code refuses to activate without them. They are installed into the
-	// throwaway test instance rather than disabled.
-	installExtensions: ["streetsidesoftware.code-spell-checker", "yzhang.markdown-all-in-one"],
+	// The companions a writer gets: the spell checker, which Writer's Studio
+	// cannot activate without, and the optional pack, so the tests see what a
+	// writer sees. Installed into the throwaway test instance only.
+	installExtensions: [
+		"streetsidesoftware.code-spell-checker",
+		"yzhang.markdown-all-in-one",
+		"streetsidesoftware.code-spell-checker-british-english",
+	],
 	mocha: {
 		ui: "bdd",
 		timeout: 60000,

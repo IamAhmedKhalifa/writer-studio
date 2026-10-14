@@ -122,6 +122,21 @@ export const strings = {
 			"Your dictionary can only be changed once you have said you trust this folder. Choose \u201cYes, I trust it\u201d when VS Code asks.",
 	},
 
+	spelling: {
+		question: "Which spelling do you use?",
+		detail:
+			"Words spelled the other way will be underlined as mistakes. You can change this later with \u201cChoose British or American spelling\u201d.",
+		british: "British: colour, organise",
+		american: "American: color, organize",
+		changed: (british: boolean) => `Spelling is now ${british ? "British" : "American"}.`,
+		takesEffectWithLook: "Saved. Your spelling choice takes effect when the writing look is on.",
+		takesEffectInWriting: "Saved. Your spelling choice takes effect the next time your writing is open.",
+		britishMissing:
+			"British spelling needs its own dictionary, which is missing. Installing Writer\u2019s Studio again brings it back.",
+		needsTrust:
+			"Spelling can only be changed once you have said you trust this folder. Choose \u201cYes, I trust it\u201d when VS Code asks.",
+	},
+
 	handoff: {
 		copiedHtml: "Copied. You can paste this straight into your website or a document.",
 		copiedHtmlAsMarkup:

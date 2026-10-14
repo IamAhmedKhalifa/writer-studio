@@ -2,6 +2,8 @@ import * as os from "os"
 import * as path from "path"
 import * as vscode from "vscode"
 import { WriterProfile } from "../profile/writerProfile"
+import { SPELLING_SETTING } from "../spelling/spellingChoice"
+import { SpellingPreference } from "../spelling/spellingPreference"
 import { strings } from "../ui/strings"
 import { LibraryService } from "./libraryService"
 
@@ -40,6 +42,7 @@ export class FirstRun {
 		private readonly context: vscode.ExtensionContext,
 		private readonly library: LibraryService,
 		private readonly profile: WriterProfile,
+		private readonly spelling: SpellingPreference,
 	) {}
 
 	/**
@@ -67,6 +70,7 @@ export class FirstRun {
 		// VS Code otherwise brings back whichever sidebar was last showing, and
 		// its own file list is one stray click away at the top of the left bar.
 		if (this.library.isLibraryOpen()) {
+			await this.catchUpOnSpelling()
 			await this.showLibraryList()
 			return
 		}
@@ -205,6 +209,12 @@ export class FirstRun {
 			return
 		}
 
+		// Asked here, just before the look goes on, so the answer always takes
+		// effect. Without trust nothing can be applied, so asking would be wasted.
+		if (vscode.workspace.isTrusted) {
+			await this.spelling.askIfNeeded()
+		}
+
 		const result = await this.profile.apply()
 
 		if (result.applied === 0) {
@@ -217,6 +227,55 @@ export class FirstRun {
 			void vscode.window.showInformationMessage(strings.setup.lookApplied)
 		}
 		await this.focusLibraryView()
+	}
+
+	/** Changes between British and American spelling. */
+	async chooseSpelling(): Promise<void> {
+		const answer = await this.spelling.ask()
+		if (answer === undefined) {
+			return
+		}
+		await this.spelling.remember(answer)
+
+		if (answer === "british" && !this.spelling.britishAvailable()) {
+			void vscode.window.showWarningMessage(strings.spelling.britishMissing)
+			return
+		}
+		if (!this.profile.isApplied()) {
+			void vscode.window.showInformationMessage(strings.spelling.takesEffectWithLook)
+			return
+		}
+		// The setting lives in the writing folder, so it can only be written with
+		// that folder open; it is caught up the next time it is.
+		if (!this.library.isLibraryOpen()) {
+			void vscode.window.showInformationMessage(strings.spelling.takesEffectInWriting)
+			return
+		}
+		if (!vscode.workspace.isTrusted) {
+			void vscode.window.showWarningMessage(strings.spelling.needsTrust)
+			return
+		}
+		const result = await this.profile.apply({ only: [SPELLING_SETTING] })
+		if (result.applied > 0) {
+			void vscode.window.showInformationMessage(strings.spelling.changed(answer === "british"))
+		} else {
+			void vscode.window.showWarningMessage(strings.errors.couldNotWrite)
+		}
+	}
+
+	/**
+	 * Applies a spelling choice made while the writing was not open. Quiet: the
+	 * writer already chose, and was told it would happen.
+	 */
+	private async catchUpOnSpelling(): Promise<void> {
+		const wanted = this.spelling.languageSetting()
+		if (wanted === undefined || !this.profile.isApplied() || !vscode.workspace.isTrusted) {
+			return
+		}
+		const current = vscode.workspace.getConfiguration().inspect(SPELLING_SETTING)?.workspaceValue
+		if (current !== wanted) {
+			await this.profile.apply({ only: [SPELLING_SETTING] })
+		}
 	}
 
 	async restoreNormalLook(): Promise<void> {

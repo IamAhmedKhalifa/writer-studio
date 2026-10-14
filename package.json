@@ -29,8 +29,11 @@
     "onLanguage:markdown"
   ],
   "extensionDependencies": [
-    "streetsidesoftware.code-spell-checker",
-    "yzhang.markdown-all-in-one"
+    "streetsidesoftware.code-spell-checker"
+  ],
+  "extensionPack": [
+    "yzhang.markdown-all-in-one",
+    "streetsidesoftware.code-spell-checker-british-english"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -163,6 +166,11 @@
       {
         "command": "writersStudio.addToDictionary",
         "title": "Add this word to my dictionary",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.chooseSpelling",
+        "title": "Choose British or American spelling",
         "category": "Writing"
       },
       {
@@ -322,19 +330,24 @@
       ],
       "editor/context": [
         {
+          "command": "cSpell.suggestSpellingCorrections",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown && !editorReadonly && editorTextFocus && cSpell.editorMenuContext.showSuggestions",
+          "group": "navigation@0.1"
+        },
+        {
           "command": "writersStudio.addToDictionary",
           "when": "writersStudio.inWritingContext && editorLangId == markdown",
-          "group": "writersStudio@1"
+          "group": "navigation@0.2"
         },
         {
           "command": "writersStudio.copyAsHtml",
           "when": "writersStudio.inWritingContext && editorLangId == markdown",
-          "group": "writersStudio@2"
+          "group": "navigation@0.3"
         },
         {
           "command": "writersStudio.copyAsPlainText",
           "when": "writersStudio.inWritingContext && editorLangId == markdown",
-          "group": "writersStudio@3"
+          "group": "navigation@0.4"
         }
       ],
       "commandPalette": [
@@ -413,6 +426,10 @@
         {
           "command": "writersStudio.addToDictionary",
           "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.chooseSpelling",
+          "when": "writersStudio.inWritingContext"
         },
         {
           "command": "writersStudio.copyAsHtml",

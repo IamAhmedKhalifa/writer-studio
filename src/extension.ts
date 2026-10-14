@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
 import { FocusMode } from "./focus/focusMode"
+import { PieceAutoSave } from "./library/autoSave"
 import { DocumentCommands } from "./library/documentCommands"
 import { FirstRun } from "./library/firstRun"
 import { LibraryService } from "./library/libraryService"
@@ -8,6 +9,7 @@ import { Handoff } from "./markdown/handoff"
 import { WriterProfile } from "./profile/writerProfile"
 import { WritingStatusBar } from "./stats/statusBar"
 import { Dictionary } from "./spelling/dictionary"
+import { SpellingPreference } from "./spelling/spellingPreference"
 import { strings } from "./ui/strings"
 import { Toolbar } from "./ui/toolbar"
 
@@ -26,12 +28,18 @@ export interface InternalApi {
 	readonly library: LibraryService
 	readonly profile: WriterProfile
 	readonly focus: FocusMode
+	readonly spelling: SpellingPreference
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<InternalApi> {
 	const library = new LibraryService(context)
-	const profile = new WriterProfile(context, () => library.getLibraryUri())
-	const firstRun = new FirstRun(context, library, profile)
+	const spelling = new SpellingPreference(context)
+	const profile = new WriterProfile(
+		context,
+		() => library.getLibraryUri(),
+		(choice) => (choice === "spelling" ? spelling.languageSetting() : undefined),
+	)
+	const firstRun = new FirstRun(context, library, profile, spelling)
 	const documents = new DocumentCommands(library, firstRun)
 	const tree = new LibraryTreeProvider(library)
 	const focus = new FocusMode(context)
@@ -43,7 +51,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 	const dictionary = new Dictionary()
 	const handoff = new Handoff(context.extensionUri)
 
-	context.subscriptions.push(library, tree, focus, statusBar)
+	context.subscriptions.push(library, tree, focus, statusBar, new PieceAutoSave(library))
 
 	context.subscriptions.push(
 		vscode.window.createTreeView("writersStudio.library", {
@@ -100,6 +108,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 	register("writersStudio.toggleFocusMode", () => focus.toggle())
 	register("writersStudio.showStatsDetail", () => statusBar.showDetail())
 	register("writersStudio.addToDictionary", () => dictionary.addWord())
+	register("writersStudio.chooseSpelling", () => firstRun.chooseSpelling())
 
 	// ---- Formatting --------------------------------------------------------
 	register("writersStudio.showFormattingMenu", () => toolbar.showMenu())
@@ -168,7 +177,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 		void firstRun.runIfNeeded()
 	}
 
-	return { library, profile, focus }
+	return { library, profile, focus, spelling }
 }
 
 /**

@@ -1,9 +1,34 @@
 import * as path from "path"
 import * as vscode from "vscode"
-import { appliesOn, SettingScope, WRITER_SETTINGS } from "./settingsCatalog"
+import { appliesOn, SettingScope, SettingSpec, WRITER_SETTINGS, WriterChoice } from "./settingsCatalog"
 
-/** The catalog, less anything VS Code does not have on this platform. */
-const SETTINGS_HERE = WRITER_SETTINGS.filter((setting) => appliesOn(setting))
+/**
+ * The catalog, less anything VS Code does not have on this platform or in this
+ * version, and anything owned by an optional companion that is not installed.
+ * Worked out on each use, because a companion can be added or removed while VS
+ * Code is running.
+ */
+function settingsHere(answerTo: (choice: WriterChoice) => unknown): SettingSpec[] {
+	const isInstalled = (extensionId: string) => vscode.extensions.getExtension(extensionId) !== undefined
+	// A setting VS Code knows has a default; an unknown one comes back bare.
+	const isKnown = (key: string) => vscode.workspace.getConfiguration().inspect(key)?.defaultValue !== undefined
+	const here: SettingSpec[] = []
+	for (const setting of WRITER_SETTINGS) {
+		if (!appliesOn(setting, process.platform, isInstalled, isKnown)) {
+			continue
+		}
+		if (setting.fromChoice === undefined) {
+			here.push(setting)
+			continue
+		}
+		// No answer, or one that says to leave the setting alone.
+		const value = answerTo(setting.fromChoice)
+		if (value !== undefined) {
+			here.push({ ...setting, value })
+		}
+	}
+	return here
+}
 
 const SNAPSHOT_KEY = "writersStudio.lookSnapshot"
 const SNAPSHOT_VERSION = 2
@@ -98,39 +123,76 @@ export class WriterProfile {
 	/** Guards against two overlapping applies both capturing a baseline. */
 	private inFlight: Promise<ApplyResult> | undefined
 
+	/** Runs applies and restores one after another, so no two use the record at once. */
+	private queue: Promise<unknown> = Promise.resolve()
+	/** How many are queued or running. */
+	private queued = 0
+
 	/** Set by the test suite to stand in for "a different folder is open". */
 	private pretendPlace: { value: string | undefined } | undefined
 
 	/**
 	 * @param libraryUri Where the writing lives, used to place entries recorded
 	 *   before entries carried their own folder.
+	 * @param answerTo The value a setting set by one of the writer's answers
+	 *   should take, or undefined to leave it alone.
 	 */
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly libraryUri: () => vscode.Uri | undefined = () => undefined,
+		private readonly answerTo: (choice: WriterChoice) => unknown = () => undefined,
 	) {}
 
 	isApplied(): boolean {
 		return this.context.globalState.get<Snapshot>(SNAPSHOT_KEY)?.version === SNAPSHOT_VERSION
 	}
 
-	async apply(): Promise<ApplyResult> {
+	/**
+	 * Applies the writing look, or with `only`, just those of its settings: used
+	 * when one answer changes, so nothing the writer has adjusted since is reset.
+	 */
+	async apply(options: { only?: readonly string[] } = {}): Promise<ApplyResult> {
+		if (options.only !== undefined) {
+			return this.serially(() => this.applyOnce(options.only))
+		}
 		// Re-entrancy guard: a second caller joins the first rather than starting
 		// its own capture.
-		this.inFlight ??= this.applyOnce().finally(() => {
+		this.inFlight ??= this.serially(() => this.applyOnce()).finally(() => {
 			this.inFlight = undefined
 		})
 		return this.inFlight
 	}
 
-	private async applyOnce(): Promise<ApplyResult> {
+	/**
+	 * Starts `work` straight away when nothing else is queued, so the record is
+	 * written before the caller's next line runs; otherwise after the rest.
+	 */
+	private serially<T>(work: () => Promise<T>): Promise<T> {
+		const run = this.queued === 0 ? work() : this.queue.then(work, work)
+		this.queued++
+		this.queue = run
+			.catch(() => undefined)
+			.then(() => {
+				this.queued--
+			})
+		return run
+	}
+
+	private async applyOnce(only?: readonly string[]): Promise<ApplyResult> {
+		const settings = settingsHere(this.answerTo).filter((setting) => only === undefined || only.includes(setting.key))
+
 		// A folder the writer has not vouched for must not be able to provoke
 		// changes to their editor-wide settings.
 		if (!vscode.workspace.isTrusted) {
-			return { applied: 0, skipped: SETTINGS_HERE.map((setting) => setting.key) }
+			return { applied: 0, skipped: settings.map((setting) => setting.key) }
 		}
 
 		const existing = this.context.globalState.get<Snapshot>(SNAPSHOT_KEY)
+		// Adjusting part of the look only makes sense while the look is on.
+		// Otherwise it would leave a one-setting record that reads as "applied".
+		if (only !== undefined && existing === undefined) {
+			return { applied: 0, skipped: [] }
+		}
 		const place = this.currentPlace()
 		const entries = [...(existing?.entries ?? [])]
 
@@ -140,7 +202,7 @@ export class WriterProfile {
 		// writer's; anything it does not cover is captured now. Reusing a partial
 		// record wholesale, as this once did, re-applied settings that nothing
 		// would ever undo.
-		const planned = SETTINGS_HERE.map((setting) => {
+		const planned = settings.map((setting) => {
 			const target = this.targetFor(setting.scope)
 			let entry = entries.find((candidate) => this.covers(candidate, setting.key, target, place))
 			if (!entry) {
@@ -190,7 +252,12 @@ export class WriterProfile {
 		return { applied, skipped }
 	}
 
+	/** Undoes the writing look, after any apply still under way. */
 	async restore(): Promise<RestoreResult> {
+		return this.serially(() => this.restoreOnce())
+	}
+
+	private async restoreOnce(): Promise<RestoreResult> {
 		const snapshot = this.context.globalState.get<Snapshot>(SNAPSHOT_KEY)
 		if (!snapshot) {
 			return { restored: 0, failed: [], waiting: 0, hadSnapshot: false }

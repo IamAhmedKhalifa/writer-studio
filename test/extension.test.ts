@@ -18,6 +18,15 @@ async function readText(uri: vscode.Uri): Promise<string> {
 	return new TextDecoder().decode(await vscode.workspace.fs.readFile(uri))
 }
 
+/** Polls `condition` until it holds, failing after `timeoutMs`. */
+async function waitFor(condition: () => boolean, timeoutMs: number): Promise<void> {
+	const deadline = Date.now() + timeoutMs
+	while (!condition()) {
+		assert.ok(Date.now() < deadline, `still waiting after ${timeoutMs} ms`)
+		await new Promise((resolve) => setTimeout(resolve, 50))
+	}
+}
+
 async function exists(uri: vscode.Uri): Promise<boolean> {
 	try {
 		await vscode.workspace.fs.stat(uri)
@@ -55,6 +64,65 @@ describe("Writer's Studio", () => {
 
 			const missing = contributed.filter((command) => !registered.has(command))
 			assert.deepEqual(missing, [], `not registered: ${missing.join(", ")}`)
+		})
+
+		it("only puts commands that exist in its menus", async () => {
+			// Menus may name another extension's command, as the right-click menu
+			// does for spelling suggestions; a misspelled one would never appear.
+			const manifest = vscode.extensions.getExtension(EXTENSION_ID)?.packageJSON as {
+				contributes: { menus: Record<string, { command: string }[]> }
+			}
+			const registered = new Set(await vscode.commands.getCommands(true))
+			const missing = Object.values(manifest.contributes.menus)
+				.flat()
+				.map((entry) => entry.command)
+				.filter((command) => !registered.has(command))
+			assert.deepEqual(missing, [], `not registered: ${missing.join(", ")}`)
+		})
+
+		it("puts its right-click entries first, spelling suggestions at the top", () => {
+			// Anywhere but the first group, they sat under two dozen programming
+			// items where a writer could not find them.
+			const manifest = vscode.extensions.getExtension(EXTENSION_ID)?.packageJSON as {
+				contributes: { menus: { "editor/context": { command: string; group: string }[] } }
+			}
+			const entries = manifest.contributes.menus["editor/context"]
+			for (const entry of entries) {
+				assert.match(entry.group, /^navigation@0\.\d+$/, `${entry.command} is not at the top`)
+			}
+			const first = [...entries].sort((a, b) => a.group.localeCompare(b.group))[0]
+			assert.equal(first.command, "cSpell.suggestSpellingCorrections")
+		})
+	})
+
+	describe("a folder the writer has not trusted", () => {
+		// The test runner always switches Workspace Trust off, so nothing here can
+		// open an untrusted folder. What decides whether the app runs there is in
+		// the manifests, so that is what these read.
+		type Manifest = {
+			extensionDependencies?: string[]
+			capabilities?: { untrustedWorkspaces?: { supported?: boolean | string } }
+		}
+		const runsUntrusted = (manifest: Manifest | undefined) => {
+			const supported = manifest?.capabilities?.untrustedWorkspaces?.supported
+			return supported === true || supported === "limited"
+		}
+
+		it("says it can run there", () => {
+			const manifest = vscode.extensions.getExtension(EXTENSION_ID)?.packageJSON as Manifest
+			assert.ok(runsUntrusted(manifest))
+		})
+
+		it("depends on nothing that is switched off there", () => {
+			// VS Code switches off every extension that depends on one it has
+			// switched off. Requiring the Markdown companion, which cannot run
+			// there, left the writer with plain VS Code and no explanation.
+			const manifest = vscode.extensions.getExtension(EXTENSION_ID)?.packageJSON as Manifest
+			for (const id of manifest.extensionDependencies ?? []) {
+				const dependency = vscode.extensions.getExtension(id)
+				assert.ok(dependency, `${id} is not installed`)
+				assert.ok(runsUntrusted(dependency.packageJSON as Manifest), `${id} does not run in an untrusted folder`)
+			}
 		})
 	})
 
@@ -307,6 +375,64 @@ describe("Writer's Studio", () => {
 			assert.ok(api.library.isInLibrary(created))
 			assert.ok(!api.library.isInLibrary(vscode.Uri.file(path.join(os.tmpdir(), "somewhere-else.md"))))
 		})
+
+		describe("saving on its own", () => {
+			// Without the writing look, VS Code's own autosave is off. These prove
+			// pieces are saved anyway, which is what was promised.
+			beforeEach(() => {
+				assert.equal(vscode.workspace.getConfiguration("files").get("autoSave"), "off")
+			})
+
+			afterEach(async () => {
+				await vscode.commands.executeCommand("workbench.action.closeAllEditors")
+			})
+
+			const type = async (document: vscode.TextDocument, text: string) => {
+				const edit = new vscode.WorkspaceEdit()
+				edit.insert(document.uri, document.lineAt(document.lineCount - 1).range.end, text)
+				assert.ok(await vscode.workspace.applyEdit(edit))
+				assert.ok(document.isDirty)
+			}
+
+			it("saves the piece being written a moment after typing stops", async () => {
+				const created = await api.library.createDraft("Saved By Itself")
+				assert.ok(created)
+				const document = await vscode.workspace.openTextDocument(created)
+				await vscode.window.showTextDocument(document)
+				await type(document, "Words worth keeping.")
+
+				await waitFor(() => !document.isDirty, 5000)
+				assert.match(await readText(created), /Words worth keeping\.$/)
+			})
+
+			it("saves an open piece that is not the one on screen", async () => {
+				const created = await api.library.createDraft("Behind The Scenes")
+				assert.ok(created)
+				const document = await vscode.workspace.openTextDocument(created)
+				await type(document, "Typed elsewhere.")
+
+				await waitFor(() => !document.isDirty, 5000)
+				assert.match(await readText(created), /Typed elsewhere\.$/)
+			})
+
+			it("leaves files outside the writing folder to the writer's own saving", async () => {
+				const outside = makeTemporaryLibrary()
+				const file = vscode.Uri.joinPath(outside, "notes.md")
+				await vscode.workspace.fs.writeFile(file, new TextEncoder().encode("# Notes\n"))
+				try {
+					const document = await vscode.workspace.openTextDocument(file)
+					await vscode.window.showTextDocument(document)
+					await type(document, "Not ours to save.")
+
+					await new Promise((resolve) => setTimeout(resolve, 2500))
+					assert.ok(document.isDirty, "a file outside the writing folder was saved")
+					assert.equal(await readText(file), "# Notes\n")
+					await vscode.commands.executeCommand("workbench.action.revertAndCloseActiveEditor")
+				} finally {
+					fs.rmSync(outside.fsPath, { recursive: true, force: true })
+				}
+			})
+		})
 	})
 
 	describe("the settings catalog", () => {
@@ -332,6 +458,15 @@ describe("Writer's Studio", () => {
 				(setting) => setting.scope === "library" && ["application", "machine"].includes(declared.get(setting.key) ?? ""),
 			).map((setting) => `${setting.key} (${declared.get(setting.key)})`)
 			assert.deepEqual(offenders, [])
+		})
+
+		it("only marks as newer settings this VS Code really has", () => {
+			// Otherwise the mark would quietly skip a misspelled key for ever.
+			const config = vscode.workspace.getConfiguration()
+			const unknown = WRITER_SETTINGS.filter(
+				(setting) => setting.newerVSCodeOnly && config.inspect(setting.key)?.defaultValue === undefined,
+			).map((setting) => setting.key)
+			assert.deepEqual(unknown, [])
 		})
 	})
 
@@ -437,6 +572,69 @@ describe("Writer's Studio", () => {
 			const result = await api.profile.restore()
 			assert.equal(result.hadSnapshot, false)
 			assert.equal(result.restored, 0)
+		})
+
+		describe("spelling", () => {
+			const language = () => vscode.workspace.getConfiguration().inspect("cSpell.language")?.globalValue
+
+			afterEach(async () => {
+				await api.spelling.forgetForTests()
+			})
+
+			it("has the British dictionary it needs installed alongside", () => {
+				assert.ok(api.spelling.britishAvailable())
+			})
+
+			it("leaves the spelling language alone until the writer has answered", async () => {
+				const before = language()
+				await api.profile.apply()
+				assert.deepEqual(language(), before)
+			})
+
+			it("spells the British way once the writer says so, and undoes it", async () => {
+				const before = language()
+				await api.spelling.remember("british")
+				const result = await api.profile.apply()
+				assert.deepEqual(result.skipped, [])
+				assert.equal(language(), "en-GB")
+
+				await api.profile.restore()
+				assert.deepEqual(language(), before)
+			})
+
+			it("never writes over a spelling language the writer chose themselves", async () => {
+				await api.spelling.remember("theirs")
+				const before = language()
+				await api.profile.apply()
+				assert.deepEqual(language(), before)
+			})
+
+			it("changes only the spelling when the answer changes", async () => {
+				const config = () => vscode.workspace.getConfiguration()
+				const originalSize = config().inspect("editor.fontSize")?.globalValue
+				await api.spelling.remember("british")
+				await api.profile.apply()
+				// The writer adjusts the page after setting it up.
+				await config().update("editor.fontSize", 21, vscode.ConfigurationTarget.Global)
+
+				await api.spelling.remember("american")
+				const result = await api.profile.apply({ only: ["cSpell.language"] })
+				assert.equal(result.applied, 1)
+				assert.equal(language(), "en")
+				assert.equal(config().inspect("editor.fontSize")?.globalValue, 21, "the writer's own change was reset")
+
+				await api.profile.restore()
+				assert.deepEqual(config().inspect("editor.fontSize")?.globalValue, originalSize)
+			})
+
+			it("never switches the look on by adjusting part of it", async () => {
+				await api.spelling.remember("british")
+				const before = language()
+				const result = await api.profile.apply({ only: ["cSpell.language"] })
+				assert.equal(result.applied, 0)
+				assert.ok(!api.profile.isApplied())
+				assert.deepEqual(language(), before)
+			})
 		})
 	})
 

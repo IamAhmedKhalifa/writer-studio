@@ -24,7 +24,9 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
   back.
 - **A writing look.** One click hides the parts of the window built for
   programmers and switches to a calm page in a serif typeface, in one of two
-  themes: **Paper** for daylight and **Night** for late sessions.
+  themes: **Paper** for daylight and **Night** for late sessions. In your writing
+  it also switches off VS Code's AI coding help and its Sign In button; your
+  other projects keep them.
 - **Focus mode.** Press Cmd+Alt+Z (Ctrl+Alt+Z on Windows and Linux) to move the
   page to the middle of the window, fade every paragraph except the one you are
   writing, and keep the line you are typing on in a comfortable place on screen.
@@ -36,7 +38,8 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
   samples, and the addresses inside links are left out. Select a passage to count
   just that passage.
 - **Spelling.** Misspelled words are underlined. Right-click for suggestions, or
-  add names and words you use often to your own dictionary.
+  add names and words you use often to your own dictionary. British or American
+  spelling, asked once when you set up the writing look and easy to change.
 - **Getting your work out.** **Copy for pasting into a website** for WordPress,
   Ghost, Substack, Medium, or a word processor; **Copy as plain text** with no
   stray symbols; and **Save as a web page**, which writes one self-contained file
@@ -56,10 +59,12 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
 - HTML pasted into a piece is shown as text rather than run, so nothing copied
   from the web can run when you preview, copy, or publish.
 - VS Code's question about whether you trust your writing folder is left on.
-  If you say no, your writing still opens and works, but anything that changes a
-  setting waits until you say yes: the writing look, adding words to your
-  dictionary, and keeping the typing line in place in focus mode. Copying for a
-  website gives you the HTML rather than formatted text.
+  If you say no, your writing still opens, saves itself, and counts its words,
+  but anything that changes a setting waits until you say yes: the writing look,
+  adding words to your dictionary, and keeping the typing line in place in focus
+  mode. Copying for a website gives you the HTML rather than formatted text, and
+  VS Code switches off the helpers that continue lists, tidy tables, and make a
+  list of contents.
 
 ### Known limitations
 

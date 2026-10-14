@@ -23,18 +23,63 @@ export function stripFrontMatter(content: string): string {
  * alt text than being empty, while a word count must not count it, because the
  * alt text is not part of the prose.
  */
-export function stripInlineMarkup(text: string, options: { keepImageAltText: boolean }): string {
+export interface InlineMarkupOptions {
+	keepImageAltText: boolean
+	/**
+	 * Keep where a link goes, in brackets after its words: "Rome (https://…)".
+	 * Wanted when copying as plain text, where the address is otherwise lost;
+	 * never when counting, because an address is not prose. Only addresses that
+	 * mean something outside this file are kept, not `#a-heading` or `other.md`.
+	 */
+	keepLinkAddresses?: boolean
+	/** Addresses of `[words][label]` links, by lower-cased label. */
+	linkDefinitions?: ReadonlyMap<string, string>
+}
+
+export function stripInlineMarkup(text: string, options: InlineMarkupOptions): string {
 	let result = text
+
+	// Addresses kept for copying are set aside until the end, so the emphasis
+	// rules below cannot eat the underscores in `https://x.com/a_b_c`.
+	const kept: string[] = []
+	const setAside = (address: string): string => {
+		kept.push(address)
+		return `\u0000${kept.length - 1}\u0000`
+	}
+	const linkWords = (words: string, destination: string | undefined): string => {
+		const address = options.keepLinkAddresses && destination !== undefined ? readableAddress(destination) : undefined
+		if (address === undefined) {
+			return words
+		}
+		// "[https://x.com](https://x.com)" is one address, not the same one twice.
+		if (words.trim() === "" || sameAddress(words, address)) {
+			return setAside(address)
+		}
+		return `${words} (${setAside(address)})`
+	}
 
 	// Images before links, so a linked image is not processed twice.
 	result = result.replace(/!\[([^\]]*)\]\([^)]*\)/g, options.keepImageAltText ? "$1" : " ")
 	result = result.replace(/!\[([^\]]*)\]\[[^\]]*\]/g, options.keepImageAltText ? "$1" : " ")
-	// Links keep their visible words and lose the address.
-	result = result.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-	result = result.replace(/\[([^\]]*)\]\[[^\]]*\]/g, "$1")
-	// Autolinks and bare addresses are not words.
-	result = result.replace(/<https?:\/\/[^>\s]+>/g, " ")
-	result = result.replace(/\bhttps?:\/\/\S+/g, " ")
+	// Links keep their visible words, and their address only when asked.
+	result = result.replace(/\[([^\]]*)\]\(([^)]*)\)/g, (_, words: string, destination: string) =>
+		linkWords(words, linkDestination(destination)),
+	)
+	result = result.replace(/\[([^\]]*)\]\[([^\]]*)\]/g, (_, words: string, label: string) =>
+		linkWords(words, options.linkDefinitions?.get((label || words).trim().toLowerCase())),
+	)
+	// Autolinks and bare addresses are not words, but copying keeps them.
+	result = result.replace(/<(https?:\/\/[^>\s]+)>/g, (_, address: string) =>
+		options.keepLinkAddresses ? setAside(address) : " ",
+	)
+	result = result.replace(/\bhttps?:\/\/\S+/g, (match) => {
+		if (!options.keepLinkAddresses) {
+			return " "
+		}
+		// The full stop ending a sentence is not part of the address.
+		const address = match.replace(/[.,;:!?)\]'"’”]+$/, "")
+		return setAside(address) + match.slice(address.length)
+	})
 	// HTML comments and tags.
 	result = result.replace(/<!--[\s\S]*?-->/g, " ")
 	result = result.replace(/<\/?[a-zA-Z][^>]*>/g, " ")
@@ -46,16 +91,66 @@ export function stripInlineMarkup(text: string, options: { keepImageAltText: boo
 	result = result.replace(/(\*|_)(.*?)\1/g, "$2")
 	result = result.replace(/~~(.*?)~~/g, "$1")
 
-	return result
+	// eslint-disable-next-line no-control-regex
+	return kept.length === 0 ? result : result.replace(/\u0000(\d+)\u0000/g, (_, index: string) => kept[Number(index)])
 }
 
-/** Removes the markers that introduce a block: heading, quote, or list item. */
-export function stripBlockPrefix(line: string): string {
+/** The address in a link's `(address "optional title")`. */
+function linkDestination(inside: string): string | undefined {
+	const trimmed = inside.trim()
+	const address = trimmed.startsWith("<") ? trimmed.slice(1, trimmed.indexOf(">")) : trimmed.split(/\s+/)[0]
+	return address === "" ? undefined : address
+}
+
+/**
+ * The address as a reader outside this file can use it, or undefined when it
+ * only means something here: a heading in the same piece, or another file.
+ */
+function readableAddress(address: string): string | undefined {
+	if (/^mailto:/i.test(address)) {
+		return address.slice("mailto:".length)
+	}
+	return /^[a-z][a-z0-9+.-]*:/i.test(address) ? address : undefined
+}
+
+function sameAddress(words: string, address: string): boolean {
+	const plain = (value: string) =>
+		value
+			.trim()
+			.toLowerCase()
+			.replace(/^[a-z][a-z0-9+.-]*:(\/\/)?/, "")
+			.replace(/\/+$/, "")
+	return plain(words) === plain(address)
+}
+
+/**
+ * The `[label]: address` definitions in a piece, by lower-cased label, so a
+ * `[words][label]` link can be copied with its address.
+ */
+export function collectLinkDefinitions(lines: readonly string[]): Map<string, string> {
+	const definitions = new Map<string, string>()
+	for (const line of lines) {
+		const match = /^[ \t]{0,3}\[([^\]]+)\]:[ \t]*<?([^\s>]+)>?/.exec(line)
+		if (match && !definitions.has(match[1].trim().toLowerCase())) {
+			definitions.set(match[1].trim().toLowerCase(), match[2])
+		}
+	}
+	return definitions
+}
+
+/**
+ * Removes the markers that introduce a block: heading, quote, or list item.
+ *
+ * `keepNumbers` leaves "1." on a numbered item. Pasted as plain text, a list
+ * whose order mattered would otherwise lose it; the bullet of an unnumbered
+ * item carries nothing, so it still goes.
+ */
+export function stripBlockPrefix(line: string, options: { keepNumbers?: boolean } = {}): string {
 	return line
 		.replace(/^[ \t]*#{1,6}[ \t]+/, "")
 		.replace(/^[ \t]*>[ \t]?/, "")
 		.replace(/^[ \t]*[-*+][ \t]+/, "")
-		.replace(/^[ \t]*\d+[.)][ \t]+/, "")
+		.replace(/^[ \t]*(\d+[.)])[ \t]+/, options.keepNumbers ? "$1 " : "")
 }
 
 /** True for a `---`, `***`, `___` rule or a `===`/`---` heading underline. */

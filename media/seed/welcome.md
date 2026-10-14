@@ -54,7 +54,8 @@ There is also **Save as a web page** if you would rather hand someone a file.
 
 Misspelled words get a coloured underline. Right-click one for suggestions. If
 it is a name or a word you use often, choose **Add this word to my dictionary**
-and it will not be flagged again.
+and it will not be flagged again. To switch between British and American
+spelling, press Cmd+Shift+P and choose **Choose British or American spelling**.
 
 ---
 

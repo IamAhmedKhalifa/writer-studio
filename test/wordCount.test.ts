@@ -139,8 +139,48 @@ describe("wordCount", () => {
 			assert.equal(toPlainText("# Title\n\nSome **bold** text"), "Title\n\nSome bold text")
 		})
 
-		it("keeps the words of a link and drops the address", () => {
-			assert.equal(toPlainText("Read [this piece](https://example.com)"), "Read this piece")
+		it("keeps the words of a link and puts its address in brackets", () => {
+			// Pasted into an email, a link that lost its address went nowhere.
+			assert.equal(toPlainText("Read [this piece](https://example.com)"), "Read this piece (https://example.com)")
+		})
+
+		it("leaves out a link's title", () => {
+			assert.equal(toPlainText('[Rome](https://rome.it "The city")'), "Rome (https://rome.it)")
+		})
+
+		it("does not repeat an address that is also the link's words", () => {
+			assert.equal(toPlainText("[example.com](https://example.com/)"), "https://example.com/")
+		})
+
+		it("shows an email link as the address alone", () => {
+			assert.equal(toPlainText("[Write to me](mailto:me@example.com)"), "Write to me (me@example.com)")
+		})
+
+		it("keeps only the words of a link that means nothing outside the piece", () => {
+			assert.equal(toPlainText("See [the ending](#the-ending) and [part two](part-two.md)"), "See the ending and part two")
+		})
+
+		it("finds the address of a link defined further down", () => {
+			const doc = ["Read [the essay][1] and [Rome][].", "", "[1]: https://example.com/essay", "[rome]: <https://rome.it>"]
+			assert.equal(toPlainText(doc.join("\n")), "Read the essay (https://example.com/essay) and Rome (https://rome.it).")
+		})
+
+		it("keeps bare addresses, without the full stop after them", () => {
+			assert.equal(toPlainText("Go to https://example.com/a_b_c. Or <https://x.org>"), "Go to https://example.com/a_b_c. Or https://x.org")
+		})
+
+		it("does not let emphasis rules eat an address", () => {
+			assert.equal(toPlainText("[*Notes*](https://x.com/a_b_c_d)"), "Notes (https://x.com/a_b_c_d)")
+		})
+
+		it("keeps the numbers of a numbered list and drops bullets", () => {
+			const doc = ["1. First", "2. Second", "", "- one", "* two", "", "> 3) Quoted"]
+			assert.equal(toPlainText(doc.join("\n")), "1. First\n2. Second\n\none\ntwo\n\n3) Quoted")
+		})
+
+		it("still leaves addresses and numbers out of the word count", () => {
+			assert.equal(countWords("Read [this piece](https://example.com/a-b) today"), 4)
+			assert.equal(countWords("1. First\n2. Second"), 2)
 		})
 
 		it("collapses runs of blank lines", () => {
