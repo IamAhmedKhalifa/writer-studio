@@ -10,6 +10,7 @@ import { WriterProfile } from "./profile/writerProfile"
 import { WritingStatusBar } from "./stats/statusBar"
 import { Dictionary } from "./spelling/dictionary"
 import { SpellingPreference } from "./spelling/spellingPreference"
+import { FormattingButton } from "./ui/formattingButton"
 import { strings } from "./ui/strings"
 import { Toolbar } from "./ui/toolbar"
 
@@ -29,6 +30,7 @@ export interface InternalApi {
 	readonly profile: WriterProfile
 	readonly focus: FocusMode
 	readonly spelling: SpellingPreference
+	readonly formattingButton: FormattingButton
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<InternalApi> {
@@ -44,6 +46,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 	const tree = new LibraryTreeProvider(library)
 	const focus = new FocusMode(context)
 	const statusBar = new WritingStatusBar()
+	const formattingButton = new FormattingButton()
 
 	// Module-level so `deactivate` can await the settings restore.
 	activeFocusMode = focus
@@ -51,7 +54,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 	const dictionary = new Dictionary()
 	const handoff = new Handoff(context.extensionUri)
 
-	context.subscriptions.push(library, tree, focus, statusBar, new PieceAutoSave(library))
+	context.subscriptions.push(library, tree, focus, statusBar, formattingButton, new PieceAutoSave(library))
 
 	context.subscriptions.push(
 		vscode.window.createTreeView("writersStudio.library", {
@@ -151,10 +154,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 		lastInWriting = inWriting
 
 		await vscode.commands.executeCommand("setContext", WRITING_CONTEXT_KEY, inWriting)
-		// The two status bar items are the only controls VS Code cannot gate with
-		// a `when` clause, so they are told the same answer directly.
+		// The status bar items are the only controls VS Code cannot gate with a
+		// `when` clause, so they are told the same answer directly.
 		focus.setInWritingContext(inWriting)
 		statusBar.setInWritingContext(inWriting)
+		formattingButton.setInWritingContext(inWriting)
 	}
 
 	context.subscriptions.push(
@@ -177,7 +181,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 		void firstRun.runIfNeeded()
 	}
 
-	return { library, profile, focus, spelling }
+	return { library, profile, focus, spelling, formattingButton }
 }
 
 /**

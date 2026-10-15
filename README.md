@@ -20,7 +20,8 @@ configure and nothing to learn beyond three keyboard shortcuts.
 3. **Answer one question.** Writer's Studio asks where your writing should live
    and suggests a **Writing** folder inside your **Documents**. Accept it, or
    pick somewhere in iCloud or Dropbox if you want your writing on more than one
-   computer.
+   computer. If the folder you pick already has other things in it, Writer's
+   Studio asks before adding anything to it.
 4. **Say yes to the writing look.** This hides everything in the window that was
    built for programmers.
 5. **Start writing.** A welcome piece opens and explains the rest. When you are
@@ -39,8 +40,9 @@ there is no save button and you cannot lose a draft by closing the window.
 
 Three more, when you want them: **Cmd+Alt+N** starts a new piece, **Cmd+Alt+M**
 opens every formatting option in one menu, and **Cmd+Alt+B** shows or hides the
-list of your writing. Everything is also on the **Formatting** button at the top
-of the window, so there is nothing to memorise.
+list of your writing. Everything is also on the **Formatting** button at the bottom
+of the window, and when you right-click your writing, so there is nothing to
+memorise.
 
 ## What it does
 

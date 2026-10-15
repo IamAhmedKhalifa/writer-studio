@@ -14,5 +14,5 @@ Three more, once those feel natural:
 | All formatting options | **Cmd+Alt+M** / Ctrl+Alt+M |
 | Show or hide the list of your writing | **Cmd+Alt+B** / Ctrl+Alt+B |
 
-Everything here is also on the **Formatting** button at the top of the window, so
-there is nothing to memorise.
+Everything here is also on the **Formatting** button at the bottom of the window,
+and when you right-click your writing, so there is nothing to memorise.

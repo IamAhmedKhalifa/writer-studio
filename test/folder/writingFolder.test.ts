@@ -148,4 +148,76 @@ describe("Writer's Studio, with the writing folder open", () => {
 		assertGlobalsAre(before, "was not put back after re-applying")
 		assert.equal(folderValue("editor.lineNumbers"), undefined)
 	})
+
+	it("underlines the other spelling in a piece, not the writer's own", async () => {
+		// Asked of the spell checker itself, so this proves the value written is
+		// one the British dictionary answers to. Not "colour"/"color": the spell
+		// checker always accepts "color", a word from its CSS dictionary. It
+		// underlines each of these under the other spelling.
+		const file = vscode.Uri.joinPath(folder, "neighbours.md")
+		await vscode.workspace.fs.writeFile(file, new TextEncoder().encode("The neighbour and the neighbor.\n"))
+		let last = ""
+		const flagged = async () => {
+			last = (await spellingIssues(file)).filter((word) => word === "neighbour" || word === "neighbor").join()
+			return last
+		}
+		const seen = () =>
+			JSON.stringify({ language: vscode.workspace.getConfiguration().inspect("cSpell.language"), flagged: last })
+		try {
+			await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file))
+
+			await api.spelling.remember("british")
+			await api.profile.apply()
+			assert.equal(folderValue("cSpell.language"), "en-GB", "spelling belongs to the writing folder")
+			await waitFor(async () => (await flagged()) === "neighbor", 20000, seen)
+
+			await api.spelling.remember("american")
+			await api.profile.apply({ only: ["cSpell.language"] })
+			await waitFor(async () => (await flagged()) === "neighbour", 20000, seen)
+		} finally {
+			await vscode.commands.executeCommand("workbench.action.closeAllEditors")
+			await api.spelling.forgetForTests()
+			fs.rmSync(file.fsPath, { force: true })
+		}
+	})
+
+	it("underlines a misspelling without VS Code's problem hover", async () => {
+		// A problem's hover showed "cSpell", "View Problem" and "Quick Fix…". With
+		// the writing look on, the spell checker draws its own underline instead,
+		// so the misspelling is found but is not a problem.
+		const file = vscode.Uri.joinPath(folder, "misspelt.md")
+		await vscode.workspace.fs.writeFile(file, new TextEncoder().encode("I did not recieve it.\n"))
+		try {
+			await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file))
+			await waitFor(async () => vscode.languages.getDiagnostics(file).length > 0, 20000, () => "no problem reported before the look")
+
+			await api.profile.apply()
+			await waitFor(async () => vscode.languages.getDiagnostics(file).length === 0, 20000, () =>
+				JSON.stringify(vscode.languages.getDiagnostics(file).map((d) => `${d.source}: ${d.message}`)),
+			)
+			assert.deepEqual(await spellingIssues(file), ["recieve"], "the misspelling must still be found")
+		} finally {
+			await vscode.commands.executeCommand("workbench.action.closeAllEditors")
+			fs.rmSync(file.fsPath, { force: true })
+		}
+	})
 })
+
+/** The words the spell checker flags in `file`, asked of it directly. */
+async function spellingIssues(file: vscode.Uri): Promise<string[]> {
+	const spellChecker = vscode.extensions.getExtension<{
+		checkDocument(document: { uri: string }): Promise<{ issues?: { text: string }[] }>
+	}>("streetsidesoftware.code-spell-checker")
+	assert.ok(spellChecker, "the spell checker is not installed")
+	const result = await (await spellChecker.activate()).checkDocument({ uri: file.toString() })
+	return (result.issues ?? []).map((issue) => issue.text)
+}
+
+/** Polls `condition` until it holds, failing after `timeoutMs` with what was seen. */
+async function waitFor(condition: () => Promise<boolean>, timeoutMs: number, seen: () => string): Promise<void> {
+	const deadline = Date.now() + timeoutMs
+	while (!(await condition())) {
+		assert.ok(Date.now() < deadline, `still waiting after ${timeoutMs} ms: ${seen()}`)
+		await new Promise((resolve) => setTimeout(resolve, 100))
+	}
+}

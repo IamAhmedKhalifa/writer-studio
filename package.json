@@ -246,7 +246,7 @@
       },
       {
         "command": "writersStudio.showFormattingMenu",
-        "title": "Formatting",
+        "title": "Formatting…",
         "category": "Writing",
         "icon": "$(text-size)"
       }
@@ -340,14 +340,19 @@
           "group": "navigation@0.2"
         },
         {
-          "command": "writersStudio.copyAsHtml",
+          "command": "writersStudio.showFormattingMenu",
           "when": "writersStudio.inWritingContext && editorLangId == markdown",
           "group": "navigation@0.3"
         },
         {
-          "command": "writersStudio.copyAsPlainText",
+          "command": "writersStudio.copyAsHtml",
           "when": "writersStudio.inWritingContext && editorLangId == markdown",
           "group": "navigation@0.4"
+        },
+        {
+          "command": "writersStudio.copyAsPlainText",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown",
+          "group": "navigation@0.5"
         }
       ],
       "commandPalette": [

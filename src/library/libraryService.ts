@@ -22,6 +22,28 @@ const TEMPLATES_DIRECTORY = "Templates"
 const TRASH_DIRECTORY = "Trash"
 const DOCUMENT_EXTENSIONS = [".md", ".markdown"]
 
+/** The folder suggested for the writing, and made when a chosen one is in use. */
+export const LIBRARY_FOLDER_NAME = "Writing"
+
+/** The starter templates, as named in the library and as shipped in `media/seed`. */
+const STARTER_TEMPLATES = [
+	{ fileName: "Blog post.md", asset: "template-blog-post.md" },
+	{ fileName: "Essay.md", asset: "template-essay.md" },
+	{ fileName: "Newsletter.md", asset: "template-newsletter.md" },
+] as const
+
+/**
+ * What a chosen folder already holds.
+ * - `new`: does not exist yet.
+ * - `empty`: exists, with nothing in it but hidden files such as `.DS_Store`.
+ * - `library`: set up by Writer's Studio before.
+ * - `occupied`: holds the writer's own things.
+ */
+export type FolderState = "new" | "empty" | "library" | "occupied"
+
+/** The writer's answer when the chosen folder already has things in it. */
+export type OccupiedFolderAnswer = "inside" | "asItIs" | undefined
+
 /** Files larger than this are listed but not counted, to keep the list quick. */
 const MAX_BYTES_FOR_COUNTING = 1_000_000
 
@@ -91,12 +113,12 @@ export class LibraryService {
 		try {
 			const stat = await vscode.workspace.fs.stat(documents)
 			if (stat.type & vscode.FileType.Directory) {
-				return vscode.Uri.joinPath(documents, "Writing")
+				return vscode.Uri.joinPath(documents, LIBRARY_FOLDER_NAME)
 			}
 		} catch {
 			// No Documents folder on this machine.
 		}
-		return vscode.Uri.file(path.join(home, "Writing"))
+		return vscode.Uri.file(path.join(home, LIBRARY_FOLDER_NAME))
 	}
 
 	/** True when the writer's library is the set of files currently open. */
@@ -125,15 +147,80 @@ export class LibraryService {
 
 	// ---- Creating the library ----------------------------------------------
 
-	/** Creates the library and its starter content. Safe to call repeatedly. */
-	async ensureLibrary(uri: vscode.Uri): Promise<void> {
+	/**
+	 * Gets a chosen folder ready to hold the writing, and returns where the writing
+	 * will actually live, or undefined if the writer backed out. Throws when the
+	 * folder cannot be created.
+	 *
+	 * The welcome piece and templates go only into a folder that is new or empty.
+	 * A folder that already holds the writer's own things is never filled without
+	 * asking: choosing Documents itself, one click away in the folder picker,
+	 * used to scatter starter files among everything else kept there.
+	 */
+	async prepareLibrary(
+		uri: vscode.Uri,
+		askAboutOccupiedFolder: (uri: vscode.Uri) => Promise<OccupiedFolderAnswer>,
+	): Promise<vscode.Uri | undefined> {
+		const state = await this.folderState(uri)
+		if (state === "occupied") {
+			const answer = await askAboutOccupiedFolder(uri)
+			if (answer === "inside") {
+				return this.prepareLibrary(vscode.Uri.joinPath(uri, LIBRARY_FOLDER_NAME), askAboutOccupiedFolder)
+			}
+			if (answer !== "asItIs") {
+				return undefined
+			}
+		}
+		// A library set up before keeps what the writer has made of it: a welcome
+		// piece or template they deleted stays deleted.
+		await this.ensureLibrary(uri, { starterFiles: state === "new" || state === "empty" })
+		return uri
+	}
+
+	/** What `uri` already holds; see `FolderState`. */
+	async folderState(uri: vscode.Uri): Promise<FolderState> {
+		let children: [string, vscode.FileType][]
+		try {
+			const stat = await vscode.workspace.fs.stat(uri)
+			if (!(stat.type & vscode.FileType.Directory)) {
+				return "occupied"
+			}
+			children = await vscode.workspace.fs.readDirectory(uri)
+		} catch {
+			return "new"
+		}
+		if (children.some(([name, type]) => name === PREVIEW_STYLESHEET_PATH[0] && type & vscode.FileType.Directory)) {
+			return "library"
+		}
+		return children.some(([name]) => !name.startsWith(".")) ? "occupied" : "empty"
+	}
+
+	/**
+	 * Creates the library, with its starter content unless told otherwise. Safe to
+	 * call repeatedly: nothing already there is overwritten.
+	 *
+	 * Without starter files, the only thing added is the hidden folder holding the
+	 * preview stylesheet, which the writing look needs.
+	 */
+	async ensureLibrary(uri: vscode.Uri, options: { starterFiles?: boolean } = {}): Promise<void> {
 		await vscode.workspace.fs.createDirectory(uri)
-		await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(uri, TEMPLATES_DIRECTORY))
-		await this.seedIfMissing(uri, "Welcome.md", "welcome.md")
-		await this.seedIfMissing(uri, path.posix.join(TEMPLATES_DIRECTORY, "Blog post.md"), "template-blog-post.md")
-		await this.seedIfMissing(uri, path.posix.join(TEMPLATES_DIRECTORY, "Essay.md"), "template-essay.md")
-		await this.seedIfMissing(uri, path.posix.join(TEMPLATES_DIRECTORY, "Newsletter.md"), "template-newsletter.md")
+		if (options.starterFiles ?? true) {
+			await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(uri, TEMPLATES_DIRECTORY))
+			await this.seedIfMissing(uri, "Welcome.md", "welcome.md")
+			for (const template of STARTER_TEMPLATES) {
+				await this.seedIfMissing(uri, path.posix.join(TEMPLATES_DIRECTORY, template.fileName), template.asset)
+			}
+		}
 		await this.installPreviewStylesheet(uri)
+	}
+
+	/** The welcome piece as shipped, for a library that has none of its own. */
+	bundledWelcomeUri(): vscode.Uri {
+		return this.seedAsset("welcome.md")
+	}
+
+	private seedAsset(assetName: string): vscode.Uri {
+		return vscode.Uri.joinPath(this.context.extensionUri, "media", "seed", assetName)
 	}
 
 	/**
@@ -162,7 +249,7 @@ export class LibraryService {
 		if (await this.exists(target)) {
 			return
 		}
-		const source = vscode.Uri.joinPath(this.context.extensionUri, "media", "seed", assetName)
+		const source = this.seedAsset(assetName)
 		try {
 			const content = await vscode.workspace.fs.readFile(source)
 			await vscode.workspace.fs.writeFile(target, content)
@@ -216,18 +303,25 @@ export class LibraryService {
 			return []
 		}
 		const templatesUri = vscode.Uri.joinPath(library, TEMPLATES_DIRECTORY)
+		let children: [string, vscode.FileType][]
 		try {
-			const children = await vscode.workspace.fs.readDirectory(templatesUri)
-			return children
-				.filter(([name, type]) => !(type & vscode.FileType.Directory) && this.isDocument(name))
-				.map(([name]) => ({
-					uri: vscode.Uri.joinPath(templatesUri, name),
-					title: displayTitleFromFileName(name),
-				}))
-				.sort((a, b) => a.title.localeCompare(b.title))
+			children = await vscode.workspace.fs.readDirectory(templatesUri)
 		} catch {
-			return []
+			// No Templates folder: a library set up in a folder that was already in
+			// use, where none was added. The shipped templates are offered instead,
+			// read straight from the app, so starting from one still works.
+			return STARTER_TEMPLATES.map((template) => ({
+				uri: this.seedAsset(template.asset),
+				title: displayTitleFromFileName(template.fileName),
+			})).sort((a, b) => a.title.localeCompare(b.title))
 		}
+		return children
+			.filter(([name, type]) => !(type & vscode.FileType.Directory) && this.isDocument(name))
+			.map(([name]) => ({
+				uri: vscode.Uri.joinPath(templatesUri, name),
+				title: displayTitleFromFileName(name),
+			}))
+			.sort((a, b) => a.title.localeCompare(b.title))
 	}
 
 	/**

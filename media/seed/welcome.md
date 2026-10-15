@@ -15,7 +15,7 @@ You will notice that bold text is wrapped in asterisks, like `**this**`. That is
 how the text is stored, and it is what lets your writing move between this app,
 your website, and anyone else's computer without breaking. You never have to
 type those asterisks yourself — use the shortcuts, or the **Formatting** button
-at the top of the window.
+at the bottom of the window. Right-clicking your writing offers it too.
 
 ## Headings
 

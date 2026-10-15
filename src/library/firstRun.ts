@@ -5,7 +5,7 @@ import { WriterProfile } from "../profile/writerProfile"
 import { SPELLING_SETTING } from "../spelling/spellingChoice"
 import { SpellingPreference } from "../spelling/spellingPreference"
 import { strings } from "../ui/strings"
-import { LibraryService } from "./libraryService"
+import { LIBRARY_FOLDER_NAME, LibraryService, OccupiedFolderAnswer } from "./libraryService"
 
 const REOPEN_PROMPT_KEY = "writersStudio.suppressReopenPrompt"
 const SETUP_OFFERED_KEY = "writersStudio.setupOffered"
@@ -127,11 +127,16 @@ export class FirstRun {
 		await this.adoptLibrary(picked[0])
 	}
 
-	private async adoptLibrary(uri: vscode.Uri): Promise<void> {
+	private async adoptLibrary(chosen: vscode.Uri): Promise<void> {
+		let uri: vscode.Uri
 		try {
-			await this.library.ensureLibrary(uri)
+			const prepared = await this.library.prepareLibrary(chosen, (folder) => this.askAboutOccupiedFolder(folder))
+			if (!prepared) {
+				return
+			}
+			uri = prepared
 		} catch {
-			void vscode.window.showErrorMessage(strings.errors.couldNotCreatePlace(this.describe(uri)))
+			void vscode.window.showErrorMessage(strings.errors.couldNotCreatePlace(this.describe(chosen)))
 			return
 		}
 
@@ -156,6 +161,24 @@ export class FirstRun {
 			// waiting to surprise them later.
 			await this.context.globalState.update(PENDING_SETUP_KEY, undefined)
 		}
+	}
+
+	/** Asked before the writing is kept in a folder that already has things in it. */
+	private async askAboutOccupiedFolder(folder: vscode.Uri): Promise<OccupiedFolderAnswer> {
+		const inside = vscode.Uri.joinPath(folder, LIBRARY_FOLDER_NAME)
+		const choice = await vscode.window.showInformationMessage(
+			strings.setup.folderInUse(this.describe(folder)),
+			{ modal: true, detail: strings.setup.folderInUseDetail(this.describe(inside)) },
+			strings.setup.folderInUseInside,
+			strings.setup.folderInUseAsItIs,
+		)
+		if (choice === strings.setup.folderInUseInside) {
+			return "inside"
+		}
+		if (choice === strings.setup.folderInUseAsItIs) {
+			return "asItIs"
+		}
+		return undefined
 	}
 
 	private async finishSetup(pending: PendingSetup): Promise<void> {
@@ -374,8 +397,21 @@ export class FirstRun {
 		if (!library) {
 			return
 		}
+		const own = vscode.Uri.joinPath(library, "Welcome.md")
 		try {
-			const document = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(library, "Welcome.md"))
+			await vscode.workspace.fs.stat(own)
+		} catch {
+			// None in the library, because it was set up in a folder that was
+			// already in use. The shipped one is shown to read, not added.
+			try {
+				await vscode.commands.executeCommand("markdown.showPreview", this.library.bundledWelcomeUri())
+			} catch {
+				// No welcome piece is not worth telling the writer about.
+			}
+			return
+		}
+		try {
+			const document = await vscode.workspace.openTextDocument(own)
 			await vscode.window.showTextDocument(document, { preview: false })
 		} catch {
 			// No welcome piece is not worth telling the writer about.

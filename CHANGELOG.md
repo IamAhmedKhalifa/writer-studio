@@ -15,7 +15,9 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
 
 - **A home for your writing.** On first run Writer's Studio suggests a
   **Writing** folder inside your **Documents**, or lets you pick somewhere in
-  iCloud or Dropbox. A welcome piece opens there and explains the rest.
+  iCloud or Dropbox. A welcome piece opens there and explains the rest. A folder
+  that already has other things in it is never filled with starter pieces
+  without asking.
 - **One list of everything you have written.** The sidebar shows your pieces
   newest first, titled by their own heading rather than by a file name.
   Right-click any piece to rename it, duplicate it, or move it to the trash.
@@ -31,13 +33,14 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
   page to the middle of the window, fade every paragraph except the one you are
   writing, and keep the line you are typing on in a comfortable place on screen.
 - **Formatting without symbols.** Bold, italic, links, headings, quotations,
-  lists, and tables from the **Formatting** button at the top of the window, or
-  from Cmd+B, Cmd+I, and Cmd+Alt+M.
+  lists, and tables from the **Formatting** button at the bottom of the window or
+  the right-click menu, or from Cmd+B, Cmd+I, and Cmd+Alt+M.
 - **A word count that counts the way an editor does.** Words, characters, and
   reading time at the bottom of the window. Settings at the top of a file, code
   samples, and the addresses inside links are left out. Select a passage to count
   just that passage.
-- **Spelling.** Misspelled words are underlined. Right-click for suggestions, or
+- **Spelling.** Misspelled words get a wavy underline. Point at one, or
+  right-click it, for suggestions, or
   add names and words you use often to your own dictionary. British or American
   spelling, asked once when you set up the writing look and easy to change.
 - **Getting your work out.** **Copy for pasting into a website** for WordPress,

@@ -28,6 +28,11 @@ export const strings = {
 		pickerTitle: "Choose where your writing should live",
 		pickerButton: "Keep my writing here",
 		created: (place: string) => `Your writing will be kept in ${place}.`,
+		folderInUse: (place: string) => `${place} already has other things in it.`,
+		folderInUseDetail: (inside: string) =>
+			`Your writing can go in a new folder inside it, ${inside}, with a welcome piece and some templates to start from.\n\nOr it can use this folder as it is. Nothing in it is changed and no starter pieces are added, but any writing already at the top of it will appear in My Writing.`,
+		folderInUseInside: "Make a new folder inside it",
+		folderInUseAsItIs: "Use it as it is",
 		applyLookPrompt: "Would you like to turn on the writing look? It hides everything built for programmers.",
 		applyLookYes: "Yes, set it up",
 		applyLookNo: "Leave it as it is",
@@ -125,7 +130,7 @@ export const strings = {
 	spelling: {
 		question: "Which spelling do you use?",
 		detail:
-			"Words spelled the other way will be underlined as mistakes. You can change this later with \u201cChoose British or American spelling\u201d.",
+			"Many words spelled the other way will be underlined as mistakes. You can change this later with \u201cChoose British or American spelling\u201d.",
 		british: "British: colour, organise",
 		american: "American: color, organize",
 		changed: (british: boolean) => `Spelling is now ${british ? "British" : "American"}.`,
@@ -155,6 +160,7 @@ export const strings = {
 
 	formatting: {
 		menuTitle: "Formatting",
+		buttonTooltip: "Bold, italic, headings, lists, links and quotations",
 		bold: "Bold",
 		italic: "Italic",
 		heading: "Heading",

@@ -4,6 +4,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import * as vscode from "vscode"
 import type { InternalApi } from "../src/extension"
+import type { OccupiedFolderAnswer } from "../src/library/libraryService"
 import { FOCUS_MODE_SETTING_KEYS, WRITER_SETTINGS } from "../src/profile/settingsCatalog"
 
 const EXTENSION_ID = "ahmed-khalifa.writers-studio"
@@ -93,6 +94,15 @@ describe("Writer's Studio", () => {
 			const first = [...entries].sort((a, b) => a.group.localeCompare(b.group))[0]
 			assert.equal(first.command, "cSpell.suggestSpellingCorrections")
 		})
+
+		it("offers formatting from the right-click menu", () => {
+			// Where the writer who could not find the Formatting button looked.
+			const manifest = vscode.extensions.getExtension(EXTENSION_ID)?.packageJSON as {
+				contributes: { menus: { "editor/context": { command: string }[] } }
+			}
+			const commands = manifest.contributes.menus["editor/context"].map((entry) => entry.command)
+			assert.ok(commands.includes("writersStudio.showFormattingMenu"), commands.join(", "))
+		})
 	})
 
 	describe("a folder the writer has not trusted", () => {
@@ -123,6 +133,100 @@ describe("Writer's Studio", () => {
 				assert.ok(dependency, `${id} is not installed`)
 				assert.ok(runsUntrusted(dependency.packageJSON as Manifest), `${id} does not run in an untrusted folder`)
 			}
+		})
+	})
+
+	describe("choosing where the writing lives", () => {
+		let parent: vscode.Uri
+		const listing = (uri: vscode.Uri) => fs.readdirSync(uri.fsPath).sort()
+		const neverAsked = async (): Promise<OccupiedFolderAnswer> => {
+			assert.fail("the writer should not have been asked")
+		}
+		/** A folder holding the writer's own things, as Documents does. */
+		const occupied = () => {
+			const folder = vscode.Uri.joinPath(parent, "Documents")
+			fs.mkdirSync(folder.fsPath)
+			fs.writeFileSync(path.join(folder.fsPath, "Tax return.pdf"), "pdf")
+			fs.writeFileSync(path.join(folder.fsPath, "notes.md"), "# My notes\n")
+			return folder
+		}
+
+		beforeEach(() => {
+			parent = makeTemporaryLibrary()
+		})
+
+		afterEach(() => {
+			fs.rmSync(parent.fsPath, { recursive: true, force: true })
+		})
+
+		it("fills a new folder with the starter pieces without asking", async () => {
+			const chosen = vscode.Uri.joinPath(parent, "Writing")
+			assert.equal((await api.library.prepareLibrary(chosen, neverAsked))?.fsPath, chosen.fsPath)
+			assert.ok(await exists(vscode.Uri.joinPath(chosen, "Welcome.md")))
+			assert.ok(await exists(vscode.Uri.joinPath(chosen, "Templates", "Essay.md")))
+		})
+
+		it("treats a folder with only hidden system files in it as empty", async () => {
+			fs.writeFileSync(path.join(parent.fsPath, ".DS_Store"), "")
+			await api.library.prepareLibrary(parent, neverAsked)
+			assert.ok(await exists(vscode.Uri.joinPath(parent, "Welcome.md")))
+		})
+
+		it("asks before using a folder that already has things in it", async () => {
+			const folder = occupied()
+			const before = listing(folder)
+			let asked: string | undefined
+			const result = await api.library.prepareLibrary(folder, async (uri) => {
+				asked = uri.fsPath
+				return undefined
+			})
+			assert.equal(asked, folder.fsPath)
+			assert.equal(result, undefined)
+			assert.deepEqual(listing(folder), before, "backing out must leave the folder untouched")
+		})
+
+		it("adds no starter pieces to a folder used as it is", async () => {
+			const folder = occupied()
+			const before = listing(folder)
+			const result = await api.library.prepareLibrary(folder, async () => "asItIs")
+			assert.equal(result?.fsPath, folder.fsPath)
+			// Only the hidden folder the writing look needs.
+			assert.deepEqual(listing(folder), [...before, ".writing"].sort())
+			assert.equal(fs.readFileSync(path.join(folder.fsPath, "notes.md"), "utf8"), "# My notes\n")
+		})
+
+		it("can make a new folder inside one that is in use", async () => {
+			const folder = occupied()
+			const before = listing(folder)
+			const result = await api.library.prepareLibrary(folder, async () => "inside")
+			const inside = vscode.Uri.joinPath(folder, "Writing")
+			assert.equal(result?.fsPath, inside.fsPath)
+			assert.deepEqual(listing(folder), [...before, "Writing"].sort())
+			assert.ok(await exists(vscode.Uri.joinPath(inside, "Welcome.md")))
+		})
+
+		it("does not put back starter pieces the writer deleted", async () => {
+			await api.library.ensureLibrary(parent)
+			fs.rmSync(path.join(parent.fsPath, "Welcome.md"))
+			fs.writeFileSync(path.join(parent.fsPath, "my-piece.md"), "# Mine\n")
+			await api.library.prepareLibrary(parent, neverAsked)
+			assert.ok(!(await exists(vscode.Uri.joinPath(parent, "Welcome.md"))))
+		})
+
+		it("still offers templates where none were added", async () => {
+			const folder = occupied()
+			await api.library.prepareLibrary(folder, async () => "asItIs")
+			await api.library.setLibraryUri(folder)
+			const templates = await api.library.listTemplates()
+			assert.deepEqual(
+				templates.map((template) => template.title),
+				["Blog post", "Essay", "Newsletter"],
+			)
+			const essay = templates.find((template) => template.title === "Essay")
+			const created = await api.library.createDraft("On Silence", essay?.uri)
+			assert.ok(created)
+			assert.ok((await readText(created)).includes("# On Silence"))
+			assert.ok(!(await exists(vscode.Uri.joinPath(folder, "Templates"))), "no Templates folder was added")
 		})
 	})
 
@@ -374,6 +478,38 @@ describe("Writer's Studio", () => {
 			assert.ok(created)
 			assert.ok(api.library.isInLibrary(created))
 			assert.ok(!api.library.isInLibrary(vscode.Uri.file(path.join(os.tmpdir(), "somewhere-else.md"))))
+		})
+
+		describe("the Formatting button", () => {
+			// The one at the top of the window can only be an icon, and a writer
+			// could not find it. This one has its name written on it.
+			afterEach(async () => {
+				await vscode.commands.executeCommand("workbench.action.closeAllEditors")
+			})
+
+			it("is on screen while a piece is open", async () => {
+				const created = await api.library.createDraft("Needs Formatting")
+				assert.ok(created)
+				await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(created))
+				await waitFor(() => api.formattingButton.isShowing(), 5000)
+			})
+
+			it("is not shown on a file that is not part of the writing", async () => {
+				const outside = makeTemporaryLibrary()
+				const file = vscode.Uri.joinPath(outside, "README.md")
+				await vscode.workspace.fs.writeFile(file, new TextEncoder().encode("# Some project\n"))
+				try {
+					const created = await api.library.createDraft("First This")
+					assert.ok(created)
+					await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(created))
+					await waitFor(() => api.formattingButton.isShowing(), 5000)
+
+					await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file))
+					await waitFor(() => !api.formattingButton.isShowing(), 5000)
+				} finally {
+					fs.rmSync(outside.fsPath, { recursive: true, force: true })
+				}
+			})
 		})
 
 		describe("saving on its own", () => {

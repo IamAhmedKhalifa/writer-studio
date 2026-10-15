@@ -233,6 +233,14 @@ export const WRITER_SETTINGS: readonly SettingSpec[] = [
 	// menu itself. The spell checker's own copy sat near the bottom, under the
 	// programming items, and would now be a second one.
 	{ key: "cSpell.showSuggestionsLinkInEditorContextMenu", value: false, scope: "library" },
+	// The spell checker draws its own underlines instead of reporting VS Code
+	// "problems". A problem's hover read `"recieve": Misspelled word. cSpell`
+	// above "View Problem", "Quick Fix…" and "Fix"; this one reads "recieve:
+	// Misspelled word. Suggestions". Misspellings also stop counting as problems
+	// in the status bar. Application-wide, as the spell checker declares it.
+	{ key: "cSpell.useCustomDecorations", value: true, scope: "everywhere" },
+	// Its own underline is dashed by default; wavy is what every writer knows.
+	{ key: "cSpell.textDecorationStyle", value: "wavy", scope: "everywhere" },
 
 	// ---- Markdown editing helpers (Markdown All in One) --------------------
 	// An optional companion: a writer can remove it, and VS Code switches it off
