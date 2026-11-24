@@ -21,6 +21,8 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
 - **One list of everything you have written.** The sidebar shows your pieces
   newest first, titled by their own heading rather than by a file name.
   Right-click any piece to rename it, duplicate it, or move it to the trash.
+  A duplicate is titled as a copy, and a new piece given a name you have
+  already used is numbered, so no two pieces in the list look the same.
   The trash is a folder inside your writing, so nothing is ever deleted outright;
   it is listed at the bottom of the sidebar, where right-clicking a piece puts it
   back.
@@ -28,7 +30,9 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
   programmers and switches to a calm page in a serif typeface, in one of two
   themes: **Paper** for daylight and **Night** for late sessions. In your writing
   it also switches off VS Code's AI coding help and its Sign In button; your
-  other projects keep them.
+  other projects keep them. It is offered in a dialog the first time your
+  writing opens, and again until you answer; after a no, it is in the menu at
+  the top of My Writing.
 - **Focus mode.** Press Cmd+Alt+Z (Ctrl+Alt+Z on Windows and Linux) to move the
   page to the middle of the window, fade every paragraph except the one you are
   writing, and keep the line you are typing on in a comfortable place on screen.
@@ -76,8 +80,10 @@ with nothing to configure and nothing to learn beyond three keyboard shortcuts.
   On Windows and Linux the menu bar folds into a single button; on a Mac it stays
   in its usual place at the top of the screen, and Writer's Studio leaves it alone.
 - Cmd+B is Bold. Showing and hiding the sidebar moved to Cmd+Alt+B.
-- Where your system will not accept formatted text on the clipboard, copying
-  falls back to the HTML itself, and the message tells you which happened.
+- On a Mac, formatted copying uses the system clipboard directly. On Windows
+  and Linux, where the system will not accept formatted text on the clipboard,
+  copying falls back to the HTML itself, and the message tells you which
+  happened.
 - Pressing Cmd+I on a passage containing two separate italic phrases adds
   emphasis rather than removing it. Press it on one phrase at a time.
 - One piece at a time: multi-chapter projects and export to Word or PDF are

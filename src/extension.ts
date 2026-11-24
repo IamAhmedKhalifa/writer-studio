@@ -31,6 +31,7 @@ export interface InternalApi {
 	readonly focus: FocusMode
 	readonly spelling: SpellingPreference
 	readonly formattingButton: FormattingButton
+	readonly firstRun: FirstRun
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<InternalApi> {
@@ -179,9 +180,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Intern
 	// for a human keeps the extension reported as still starting up.
 	if (context.extensionMode !== vscode.ExtensionMode.Test) {
 		void firstRun.runIfNeeded()
+		// The writing look waits for trust; this is the moment it can be offered.
+		context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(() => void firstRun.trustGranted()))
 	}
 
-	return { library, profile, focus, spelling, formattingButton }
+	return { library, profile, focus, spelling, formattingButton, firstRun }
 }
 
 /**

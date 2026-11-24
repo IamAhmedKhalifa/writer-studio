@@ -33,9 +33,13 @@ export const strings = {
 			`Your writing can go in a new folder inside it, ${inside}, with a welcome piece and some templates to start from.\n\nOr it can use this folder as it is. Nothing in it is changed and no starter pieces are added, but any writing already at the top of it will appear in My Writing.`,
 		folderInUseInside: "Make a new folder inside it",
 		folderInUseAsItIs: "Use it as it is",
-		applyLookPrompt: "Would you like to turn on the writing look? It hides everything built for programmers.",
+		applyLookPrompt: "Would you like to turn on the writing look?",
+		applyLookDetail:
+			"It hides everything built for programmers and gives you a calm page to write on. You can undo it any time.",
 		applyLookYes: "Yes, set it up",
 		applyLookNo: "Leave it as it is",
+		applyLookLater:
+			"You can turn the writing look on later from the \u22ef menu at the top of My Writing: choose \u201cSet up the writing look\u201d.",
 		lookApplied: "The writing look is on. You can undo this any time with \u201cRestore the normal VS Code look\u201d.",
 		lookAppliedPartly: (count: number) =>
 			`The writing look is mostly on. ${count} ${count === 1 ? "setting" : "settings"} could not be changed, which usually means a helper is switched off.`,

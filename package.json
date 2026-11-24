@@ -274,9 +274,14 @@
           "group": "9_settings@1"
         },
         {
-          "command": "writersStudio.restoreNormalLook",
+          "command": "writersStudio.setUpWritingLook",
           "when": "view == writersStudio.library",
           "group": "9_settings@2"
+        },
+        {
+          "command": "writersStudio.restoreNormalLook",
+          "when": "view == writersStudio.library",
+          "group": "9_settings@3"
         }
       ],
       "view/item/context": [

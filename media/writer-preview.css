@@ -1,5 +1,10 @@
 /*
- * Styles for the built-in preview, contributed through markdown.previewStyles.
+ * Styles for the built-in preview. Setup copies this file into the writing
+ * folder as .writing/preview.css, and the writing look points the folder's
+ * markdown.styles setting at that copy, so the preview is styled only in the
+ * writing and never in the writer's other projects. Nothing in the manifest
+ * contributes it. The copy is written when a writing folder is set up, so a
+ * change here reaches an existing folder only when it is set up again.
  *
  * The goal is a page that looks like something a reader would read, not a
  * technical document: one comfortable column, a serif face, generous leading,

@@ -1,25 +1,78 @@
+import { execFile } from "child_process"
 import { randomBytes } from "crypto"
 import * as vscode from "vscode"
 
 /** If the browser copy has not answered by now, fall back instead of hanging. */
 const TIMEOUT_MS = 2000
 
+/** Starting the system's script runner can be slow on a busy machine. */
+const MAC_TIMEOUT_MS = 5000
+
 /**
  * Puts formatted text on the clipboard, so that pasting into a blog editor, a
  * newsletter, or a word processor arrives with its headings, bold text, and
- * links intact.
+ * links intact. `plainText` goes alongside it for places that only take plain
+ * text, such as a search box or a text message.
  *
  * Why this is roundabout: the VS Code API can only place plain text on the
- * clipboard. The system clipboard needs a `text/html` flavour for a rich paste,
- * and the only way to produce one without shipping platform-specific helper
- * programs is to let a web view select the rendered content and copy it the way
- * a browser would.
+ * clipboard. A rich paste needs an HTML flavour on the system clipboard as well.
  *
- * The panel exists for a fraction of a second and is always closed again. Every
- * failure path returns false so the caller can fall back to plain text; a failed
- * rich copy must never lose the writer's work or leave a stray panel behind.
+ * - On macOS the HTML is handed to the system clipboard directly, through the
+ *   script runner (`osascript`) that comes with every Mac. A web view cannot do
+ *   it there: its copy is refused, which is what finding F10 was.
+ * - Elsewhere, and on a Mac if that fails, a web view selects the rendered
+ *   content and copies it the way a browser would. Nothing platform-specific is
+ *   shipped with the extension either way.
+ *
+ * Every failure path returns false so the caller can fall back to plain text; a
+ * failed rich copy must never lose the writer's work or leave a stray panel
+ * behind.
  */
-export async function copyRichText(bodyHtml: string): Promise<boolean> {
+export async function copyRichText(bodyHtml: string, plainText: string): Promise<boolean> {
+	if (process.platform === "darwin" && (await copyRichTextOnMac(bodyHtml, plainText))) {
+		return true
+	}
+	return copyRichTextThroughWebView(bodyHtml)
+}
+
+/**
+ * Runs inside `osascript` as JavaScript for Automation. It reads one JSON
+ * object from standard input, so the writer's text is never part of a command
+ * line, and writes both flavours in one go. The type names are spelled out
+ * because the AppKit constants do not arrive as strings in this bridge.
+ */
+const MAC_SCRIPT = `ObjC.import("AppKit");
+function run() {
+  const data = $.NSFileHandle.fileHandleWithStandardInput.readDataToEndOfFile;
+  const input = JSON.parse(ObjC.unwrap($.NSString.alloc.initWithDataEncoding(data, $.NSUTF8StringEncoding)));
+  const board = $.NSPasteboard.generalPasteboard;
+  board.clearContents;
+  const html = board.setStringForType($(input.html), $("public.html"));
+  const text = board.setStringForType($(input.text), $("public.utf8-plain-text"));
+  return html && text ? "copied" : "refused";
+}`
+
+function copyRichTextOnMac(bodyHtml: string, plainText: string): Promise<boolean> {
+	return new Promise((resolve) => {
+		try {
+			const child = execFile(
+				"osascript",
+				["-l", "JavaScript", "-e", MAC_SCRIPT],
+				{ timeout: MAC_TIMEOUT_MS },
+				(error, stdout) => resolve(!error && stdout.trim() === "copied"),
+			)
+			child.stdin?.on("error", () => resolve(false))
+			// The meta tag is what a browser puts in front of copied HTML; some
+			// word processors read the bytes rather than the text and need it to
+			// get accented letters and curly quotes right.
+			child.stdin?.end(JSON.stringify({ html: `<meta charset="utf-8">${bodyHtml}`, text: plainText }))
+		} catch {
+			resolve(false)
+		}
+	})
+}
+
+async function copyRichTextThroughWebView(bodyHtml: string): Promise<boolean> {
 	let panel: vscode.WebviewPanel | undefined
 
 	try {

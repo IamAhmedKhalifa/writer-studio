@@ -10,6 +10,27 @@ import { LIBRARY_FOLDER_NAME, LibraryService, OccupiedFolderAnswer } from "./lib
 const REOPEN_PROMPT_KEY = "writersStudio.suppressReopenPrompt"
 const SETUP_OFFERED_KEY = "writersStudio.setupOffered"
 const PENDING_SETUP_KEY = "writersStudio.pendingSetup"
+/** Set when the writer said no to the writing look, or took it off again. */
+const LOOK_DECLINED_KEY = "writersStudio.lookDeclined"
+
+export interface LookOfferState {
+	libraryOpen: boolean
+	trusted: boolean
+	applied: boolean
+	declined: boolean
+}
+
+/**
+ * Whether to ask about the writing look now. Only with the writing open, since
+ * that is where it goes; only in a trusted folder, since otherwise saying yes
+ * could change nothing; and never again once the writer has said no or undone
+ * it. Closing the question without answering is not a no, so it comes back the
+ * next time the writing opens: a question that is easy to miss and never asked
+ * again was finding F19.
+ */
+export function shouldOfferLook(state: LookOfferState): boolean {
+	return state.libraryOpen && state.trusted && !state.applied && !state.declined
+}
 
 interface PendingSetup {
 	/** Apply the writing look once the library is the folder that is open. */
@@ -72,6 +93,7 @@ export class FirstRun {
 		if (this.library.isLibraryOpen()) {
 			await this.catchUpOnSpelling()
 			await this.showLibraryList()
+			await this.offerWritingLookIfDue()
 			return
 		}
 
@@ -186,7 +208,9 @@ export class FirstRun {
 			await this.restoreNormalLook()
 			return
 		}
-		if (pending.applyLook) {
+		// Without trust, saying yes could change nothing. The question waits until
+		// the writer trusts the folder (see `trustGranted`).
+		if (pending.applyLook && vscode.workspace.isTrusted) {
 			await this.offerWritingLook()
 		}
 		if (pending.openWelcome) {
@@ -195,15 +219,48 @@ export class FirstRun {
 		await this.focusLibraryView()
 	}
 
+	/** Whether the writer has said no to the writing look, or taken it off. */
+	isLookDeclined(): boolean {
+		return this.context.globalState.get<boolean>(LOOK_DECLINED_KEY) === true
+	}
+
+	/** Called when the writer says they trust the open folder. */
+	async trustGranted(): Promise<void> {
+		await this.offerWritingLookIfDue()
+	}
+
+	private async offerWritingLookIfDue(): Promise<void> {
+		const due = shouldOfferLook({
+			libraryOpen: this.library.isLibraryOpen(),
+			trusted: vscode.workspace.isTrusted,
+			applied: this.profile.isApplied(),
+			declined: this.isLookDeclined(),
+		})
+		if (due) {
+			await this.offerWritingLook()
+		}
+	}
+
+	/**
+	 * A dialog rather than a notification. Notifications can slip into the bell
+	 * unseen, and this is the one question the whole app depends on (F19).
+	 */
 	private async offerWritingLook(): Promise<void> {
 		const choice = await vscode.window.showInformationMessage(
 			strings.setup.applyLookPrompt,
+			{ modal: true, detail: strings.setup.applyLookDetail },
 			strings.setup.applyLookYes,
 			strings.setup.applyLookNo,
 		)
 		if (choice === strings.setup.applyLookYes) {
 			await this.applyWritingLook()
+			return
 		}
+		if (choice === strings.setup.applyLookNo) {
+			await this.context.globalState.update(LOOK_DECLINED_KEY, true)
+			void vscode.window.showInformationMessage(strings.setup.applyLookLater)
+		}
+		// Closed without an answer: asked again the next time the writing opens.
 	}
 
 	/**
@@ -241,9 +298,11 @@ export class FirstRun {
 		const result = await this.profile.apply()
 
 		if (result.applied === 0) {
-			void vscode.window.showWarningMessage(strings.setup.lookNotApplied)
+			void vscode.window.showWarningMessage(strings.setup.lookNotApplied, { modal: true })
 			return
 		}
+		// Asked for, so no longer declined, whatever was said before.
+		await this.context.globalState.update(LOOK_DECLINED_KEY, undefined)
 		if (result.skipped.length > 0) {
 			void vscode.window.showInformationMessage(strings.setup.lookAppliedPartly(result.skipped.length))
 		} else {
@@ -308,6 +367,8 @@ export class FirstRun {
 			void vscode.window.showInformationMessage(strings.setup.lookRestoreNothingToDo)
 			return
 		}
+		// Taking the look off is an answer: it is not offered again by itself.
+		await this.context.globalState.update(LOOK_DECLINED_KEY, true)
 		// The writing folder's own part can only be undone with it open. Offering
 		// to open it is pointless when it already is: what is waiting then belongs
 		// to a place the writer has since moved away from, and is reported below
@@ -316,9 +377,12 @@ export class FirstRun {
 			await this.offerToFinishRestoreInLibrary()
 			return
 		}
+		// A dialog: a warning that slips into the bell unseen leaves the writer
+		// believing everything was put back (F19).
 		if (result.failed.length > 0 || result.waiting > 0) {
 			void vscode.window.showWarningMessage(
 				strings.setup.lookRestoredPartly(result.failed.length + result.waiting),
+				{ modal: true },
 			)
 			return
 		}

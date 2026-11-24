@@ -28,12 +28,13 @@ export class Handoff {
 			return
 		}
 
-		const html = renderBody(document.getText())
+		const markdown = document.getText()
+		const html = renderBody(markdown)
 
-		// The rich copy renders the document in a web view. In a folder the writer
-		// has not vouched for, fall straight through to the plain path rather than
-		// rendering its contents at all.
-		const rich = vscode.workspace.isTrusted ? await copyRichText(html) : false
+		// The rich copy can render the document in a web view. In a folder the
+		// writer has not vouched for, fall straight through to the plain path
+		// rather than rendering its contents at all.
+		const rich = vscode.workspace.isTrusted ? await copyRichText(html, toPlainText(markdown)) : false
 		if (rich) {
 			void vscode.window.showInformationMessage(strings.handoff.copiedHtml)
 			return

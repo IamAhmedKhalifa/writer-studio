@@ -9,10 +9,12 @@ import {
 	displayTitleFromFileName,
 	draftFileName,
 	extractTitle,
+	findTitleSource,
 	retitleHeading,
 	rewriteTitleLine,
 	slugify,
 	uniqueFileName,
+	uniqueTitle,
 } from "./naming"
 import { fillTemplate } from "./templates"
 
@@ -398,11 +400,14 @@ export class LibraryService {
 		const fileName = uniqueFileName(desired, existing)
 		const target = vscode.Uri.joinPath(library, fileName)
 
-		let content = title ? `# ${title}\n\n` : ""
+		// A name already in use gets a number, the way its file name does, so the
+		// two pieces can be told apart in the list.
+		const heading = title ? uniqueTitle(title, await this.existingTitles()) : undefined
+		let content = heading ? `# ${heading}\n\n` : ""
 		if (templateUri) {
 			try {
 				const template = new TextDecoder().decode(await vscode.workspace.fs.readFile(templateUri))
-				content = fillTemplate(template, title)
+				content = fillTemplate(template, heading)
 			} catch {
 				// Fall back to the blank page rather than failing.
 			}
@@ -523,9 +528,30 @@ export class LibraryService {
 		const stem = currentName.slice(0, currentName.length - extension.length)
 		const existing = await this.existingFileNames(library)
 		const target = vscode.Uri.joinPath(library, uniqueFileName(`${copyTitle(stem)}${extension}`, existing))
-		await vscode.workspace.fs.copy(uri, target, { overwrite: false })
+
+		// The copy's heading says it is a copy, as its file name does; otherwise the
+		// list showed two pieces with the same title. A piece titled by its opening
+		// sentence is copied untouched: that sentence is the writer's prose, not a
+		// label (see `retitleHeading`).
+		const content = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri))
+		const title = findTitleSource(content)?.title
+		const retitled =
+			title === undefined
+				? undefined
+				: rewriteTitleLine(content, uniqueTitle(copyTitle(title), await this.existingTitles()))
+
+		if (retitled === undefined) {
+			await vscode.workspace.fs.copy(uri, target, { overwrite: false })
+		} else {
+			await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(retitled))
+		}
 		this.announceChange()
 		return target
+	}
+
+	/** The titles the list of pieces shows right now. */
+	private async existingTitles(): Promise<string[]> {
+		return (await this.listDocuments()).map((entry) => entry.title)
 	}
 
 	/**

@@ -118,7 +118,9 @@ if you also use VS Code for code, your other projects are untouched.
   hide the sidebar; that moved to **Cmd+Alt+B**. Markdown All in One also binds
   Cmd+B to its own bold command, so whichever of the two answers, you get bold.
 - **Rich pasting depends on your system.** *Copy for pasting into a website*
-  tries to place formatted text on the clipboard. Where the system refuses, it
+  places formatted text on the clipboard. On a Mac it uses the system's own
+  clipboard; on Windows and Linux it copies the way a web page would, and where
+  the system refuses, it
   falls back to the HTML itself, which still pastes correctly into the HTML view
   every blogging tool provides. The message tells you which one happened.
 - **Raw HTML in a piece is shown, not obeyed.** If you paste `<script>` or other

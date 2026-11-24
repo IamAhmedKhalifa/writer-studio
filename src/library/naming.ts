@@ -299,6 +299,31 @@ export function copyTitle(title: string): string {
 }
 
 /**
+ * `title` if no other piece is called that, otherwise `title (2)`, `title (3)`,
+ * and so on.
+ *
+ * The list of pieces shows titles, not file names, so two pieces with the same
+ * title look like one piece listed twice: a duplicate and its original, or two
+ * drafts given the same name, were indistinguishable (finding F16). Brackets
+ * rather than a bare number, so "Chapter 2" becomes "Chapter 2 (2)" and not
+ * "Chapter 2 2". Compared without regard to case, because "Morning" and
+ * "morning" read as the same title in a list.
+ */
+export function uniqueTitle(title: string, existing: readonly string[]): string {
+	const taken = new Set(existing.map((name) => name.trim().toLowerCase()))
+	if (!taken.has(title.trim().toLowerCase())) {
+		return title
+	}
+	for (let number = 2; number < 1000; number++) {
+		const attempt = `${title} (${number})`
+		if (!taken.has(attempt.toLowerCase())) {
+			return attempt
+		}
+	}
+	return title
+}
+
+/**
  * A title keeps an image's alt text, because a piece that opens with a picture is
  * better titled by its caption than left as "Untitled". The word count makes the
  * opposite choice; both use the same stripper so nothing else can drift.

@@ -11,6 +11,7 @@ import {
 	rewriteTitleLine,
 	slugify,
 	uniqueFileName,
+	uniqueTitle,
 } from "../src/library/naming"
 
 describe("naming", () => {
@@ -167,6 +168,25 @@ describe("naming", () => {
 	describe("copyTitle", () => {
 		it("marks a duplicate plainly", () => {
 			assert.equal(copyTitle("Essay"), "Essay copy")
+		})
+	})
+
+	describe("uniqueTitle", () => {
+		it("keeps a title nobody else has", () => {
+			assert.equal(uniqueTitle("Morning", ["Evening"]), "Morning")
+		})
+
+		it("numbers a title that is already in use", () => {
+			assert.equal(uniqueTitle("Morning", ["Morning"]), "Morning (2)")
+			assert.equal(uniqueTitle("Morning", ["Morning", "Morning (2)"]), "Morning (3)")
+		})
+
+		it("treats titles that differ only in capitals as the same", () => {
+			assert.equal(uniqueTitle("morning", ["Morning"]), "morning (2)")
+		})
+
+		it("keeps a number that is part of the title readable", () => {
+			assert.equal(uniqueTitle("Chapter 2", ["Chapter 2"]), "Chapter 2 (2)")
 		})
 	})
 

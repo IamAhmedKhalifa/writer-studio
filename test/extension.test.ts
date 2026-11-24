@@ -1,9 +1,11 @@
 import * as assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import * as vscode from "vscode"
 import type { InternalApi } from "../src/extension"
+import { type LookOfferState, shouldOfferLook } from "../src/library/firstRun"
 import type { OccupiedFolderAnswer } from "../src/library/libraryService"
 import { FOCUS_MODE_SETTING_KEYS, WRITER_SETTINGS } from "../src/profile/settingsCatalog"
 
@@ -308,6 +310,26 @@ describe("Writer's Studio", () => {
 			assert.ok(await exists(second))
 		})
 
+		it("numbers a title that another piece already has, so the list can tell them apart", async () => {
+			const first = await api.library.createDraft("Same Name")
+			const second = await api.library.createDraft("Same Name")
+			assert.ok(first && second)
+			assert.equal(await readText(first), "# Same Name\n\n")
+			assert.equal(await readText(second), "# Same Name (2)\n\n")
+
+			const titles = (await api.library.listDocuments()).map((entry) => entry.title)
+			assert.ok(titles.includes("Same Name") && titles.includes("Same Name (2)"), titles.join(", "))
+		})
+
+		it("numbers a template's title the same way", async () => {
+			const essay = (await api.library.listTemplates()).find((template) => template.title === "Essay")
+			assert.ok(essay)
+			await api.library.createDraft("On Silence", essay.uri)
+			const second = await api.library.createDraft("On Silence", essay.uri)
+			assert.ok(second)
+			assert.match(await readText(second), /^# On Silence \(2\)$/m)
+		})
+
 		it("fills a template in and keeps the writer's title", async () => {
 			const templates = await api.library.listTemplates()
 			const essay = templates.find((template) => template.title === "Essay")
@@ -418,7 +440,31 @@ describe("Writer's Studio", () => {
 			assert.ok(copy)
 			assert.ok(path.basename(copy.fsPath).includes("copy"))
 			assert.ok(await exists(created))
-			assert.equal(await readText(copy), await readText(created))
+			assert.equal(await readText(created), "# Original\n\n")
+		})
+
+		it("titles a duplicate as a copy, so it is not mistaken for the original", async () => {
+			const created = await api.library.createDraft("Original")
+			assert.ok(created)
+			await vscode.workspace.fs.writeFile(created, new TextEncoder().encode("# Original\n\nThe words.\n"))
+
+			const copy = await api.library.duplicateDocument(created)
+			const again = await api.library.duplicateDocument(created)
+			assert.ok(copy && again)
+			assert.equal(await readText(copy), "# Original copy\n\nThe words.\n")
+			assert.equal(await readText(again), "# Original copy (2)\n\nThe words.\n")
+			assert.equal(await readText(created), "# Original\n\nThe words.\n")
+		})
+
+		it("copies a piece titled by its opening sentence without changing a word", async () => {
+			const created = await api.library.createDraft(undefined)
+			assert.ok(created)
+			const words = "It was a bright cold day in April.\n\nMore words.\n"
+			await vscode.workspace.fs.writeFile(created, new TextEncoder().encode(words))
+
+			const copy = await api.library.duplicateDocument(created)
+			assert.ok(copy)
+			assert.equal(await readText(copy), words)
 		})
 
 		it("moves a piece to a trash folder rather than deleting it", async () => {
@@ -710,6 +756,36 @@ describe("Writer's Studio", () => {
 			assert.equal(result.restored, 0)
 		})
 
+		describe("being offered", () => {
+			const due: LookOfferState = { libraryOpen: true, trusted: true, applied: false, declined: false }
+
+			it("is offered whenever the writing opens without it, until answered", () => {
+				// Closing the question without answering leaves nothing recorded, so
+				// this is also the state the next time the writing opens.
+				assert.equal(shouldOfferLook(due), true)
+			})
+
+			it("is not offered once the writer has said no or taken it off", () => {
+				assert.equal(shouldOfferLook({ ...due, declined: true }), false)
+			})
+
+			it("is not offered when it is already on", () => {
+				assert.equal(shouldOfferLook({ ...due, applied: true }), false)
+			})
+
+			it("waits for the writing to be open, and for the folder to be trusted", () => {
+				assert.equal(shouldOfferLook({ ...due, libraryOpen: false }), false)
+				assert.equal(shouldOfferLook({ ...due, trusted: false }), false)
+			})
+
+			it("counts taking it off as an answer", async () => {
+				await api.profile.apply()
+				await api.firstRun.restoreNormalLook()
+				assert.equal(api.profile.isApplied(), false)
+				assert.equal(api.firstRun.isLookDeclined(), true)
+			})
+		})
+
 		describe("spelling", () => {
 			const language = () => vscode.workspace.getConfiguration().inspect("cSpell.language")?.globalValue
 
@@ -859,6 +935,59 @@ describe("Writer's Studio", () => {
 			await api.focus.enter()
 			await api.focus.exit()
 			assertRestored(before)
+		})
+	})
+
+	describe("copying for a website", () => {
+		/** Reads one flavour of the system clipboard on a Mac. */
+		function readMacClipboard(type: string): string {
+			return execFileSync(
+				"osascript",
+				[
+					"-l",
+					"JavaScript",
+					"-e",
+					`ObjC.import("AppKit"); ObjC.unwrap($.NSPasteboard.generalPasteboard.stringForType($("${type}"))) || ""`,
+				],
+				{ encoding: "utf8" },
+			).replace(/\n$/, "")
+		}
+
+		let writersClipboard = ""
+
+		before(async function () {
+			if (process.platform !== "darwin") {
+				this.skip()
+			}
+			writersClipboard = await vscode.env.clipboard.readText()
+		})
+
+		after(async () => {
+			await vscode.commands.executeCommand("workbench.action.closeAllEditors")
+			if (process.platform === "darwin") {
+				await vscode.env.clipboard.writeText(writersClipboard)
+			}
+		})
+
+		it("puts formatted text on the Mac clipboard, with plain words alongside", async () => {
+			const document = await vscode.workspace.openTextDocument({
+				language: "markdown",
+				content: "# A “quoted” title\n\nSome **bold** words and a [link](https://example.com).\n",
+			})
+			await vscode.window.showTextDocument(document)
+			await vscode.env.clipboard.writeText("something else")
+
+			await vscode.commands.executeCommand("writersStudio.copyAsHtml")
+
+			const html = readMacClipboard("public.html")
+			assert.match(html, /<h1>A “quoted” title<\/h1>/)
+			assert.match(html, /<strong>bold<\/strong>/)
+			assert.match(html, /<a href="https:\/\/example\.com">link<\/a>/)
+
+			// What a plain-text box receives: the words, without the formatting marks.
+			const text = await vscode.env.clipboard.readText()
+			assert.ok(text.includes("Some bold words"), text)
+			assert.ok(!text.includes("**") && !text.includes("<"), text)
 		})
 	})
 })
