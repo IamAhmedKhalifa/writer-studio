@@ -1,0 +1,149 @@
+/*
+ * Styles for the built-in preview. Setup copies this file into the writing
+ * folder as .writing/preview.css, and the writing look points the folder's
+ * markdown.styles setting at that copy, so the preview is styled only in the
+ * writing and never in the writer's other projects. Nothing in the manifest
+ * contributes it. The copy is written when a writing folder is set up, so a
+ * change here reaches an existing folder only when it is set up again.
+ *
+ * The goal is a page that looks like something a reader would read, not a
+ * technical document: one comfortable column, a serif face, generous leading,
+ * and headings that are quiet rather than loud.
+ *
+ * Colours deliberately inherit from the active theme so the preview matches
+ * Paper or Night without a second set of colour rules.
+ */
+
+body.vscode-body {
+	font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+	font-size: 17px;
+	line-height: 1.75;
+	max-width: 38rem;
+	margin: 0 auto;
+	padding: 3.5rem 1.5rem 8rem;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+}
+
+body.vscode-body h1,
+body.vscode-body h2,
+body.vscode-body h3,
+body.vscode-body h4,
+body.vscode-body h5,
+body.vscode-body h6 {
+	font-weight: 600;
+	line-height: 1.25;
+	letter-spacing: -0.01em;
+	margin-top: 2.25em;
+	margin-bottom: 0.6em;
+	border-bottom: none;
+	padding-bottom: 0;
+}
+
+body.vscode-body h1 {
+	font-size: 2.1em;
+	margin-top: 0;
+	letter-spacing: -0.02em;
+}
+
+body.vscode-body h2 {
+	font-size: 1.5em;
+}
+
+body.vscode-body h3 {
+	font-size: 1.2em;
+}
+
+body.vscode-body h4,
+body.vscode-body h5,
+body.vscode-body h6 {
+	font-size: 1em;
+	font-style: italic;
+	font-weight: 600;
+}
+
+body.vscode-body p {
+	margin: 0 0 1.35em;
+}
+
+body.vscode-body blockquote {
+	margin: 1.8em 0;
+	padding: 0 0 0 1.4em;
+	border-left: 2px solid currentColor;
+	border-color: color-mix(in srgb, currentColor 25%, transparent);
+	font-style: italic;
+	opacity: 0.85;
+}
+
+body.vscode-body ul,
+body.vscode-body ol {
+	margin: 0 0 1.35em;
+	padding-left: 1.5em;
+}
+
+body.vscode-body li {
+	margin-bottom: 0.4em;
+}
+
+body.vscode-body li > p {
+	margin-bottom: 0.5em;
+}
+
+body.vscode-body a {
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.18em;
+}
+
+body.vscode-body hr {
+	border: none;
+	height: 0;
+	margin: 3em auto;
+	width: 6rem;
+	border-top: 1px solid currentColor;
+	opacity: 0.25;
+}
+
+body.vscode-body img {
+	max-width: 100%;
+	height: auto;
+	display: block;
+	margin: 2em auto;
+}
+
+body.vscode-body table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 2em 0;
+	font-size: 0.95em;
+}
+
+body.vscode-body th,
+body.vscode-body td {
+	text-align: left;
+	padding: 0.5em 0.75em;
+	border: none;
+	border-bottom: 1px solid currentColor;
+	border-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+
+body.vscode-body th {
+	font-weight: 600;
+}
+
+body.vscode-body code,
+body.vscode-body pre {
+	font-family: "SF Mono", Menlo, Consolas, monospace;
+	font-size: 0.87em;
+}
+
+body.vscode-body pre {
+	padding: 1em 1.2em;
+	border-radius: 4px;
+	line-height: 1.5;
+	overflow-x: auto;
+}
+
+/* Footnote markers and the footnote list read as an aside, not as body text. */
+body.vscode-body sup {
+	font-size: 0.75em;
+}
