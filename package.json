@@ -1,0 +1,620 @@
+{
+  "name": "writers-studio",
+  "displayName": "Writer's Studio",
+  "description": "A calm, distraction-free place to write. No coding required.",
+  "version": "0.1.0",
+  "publisher": "ahmed-khalifa",
+  "license": "MIT",
+  "icon": "media/icons/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IamAhmedKhalifa/writer-studio/"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "writing",
+    "markdown",
+    "blogging",
+    "focus",
+    "distraction free"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onLanguage:markdown"
+  ],
+  "extensionDependencies": [
+    "streetsidesoftware.code-spell-checker"
+  ],
+  "extensionPack": [
+    "yzhang.markdown-all-in-one",
+    "streetsidesoftware.code-spell-checker-british-english"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In a folder you have not marked as trusted, Writer's Studio will not change your settings or copy formatted text, because both read the contents of that folder.",
+      "restrictedConfigurations": [
+        "writersStudio.focus.typewriterLines",
+        "writersStudio.focus.maxCharactersForDimming"
+      ]
+    }
+  },
+  "contributes": {
+    "themes": [
+      {
+        "label": "Writer's Studio Paper",
+        "uiTheme": "vs",
+        "path": "./themes/writers-studio-paper.json"
+      },
+      {
+        "label": "Writer's Studio Night",
+        "uiTheme": "vs-dark",
+        "path": "./themes/writers-studio-night.json"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "writersStudio",
+          "title": "My Writing",
+          "icon": "./media/icons/pen.svg"
+        }
+      ]
+    },
+    "views": {
+      "writersStudio": [
+        {
+          "id": "writersStudio.library",
+          "name": "My Writing",
+          "icon": "./media/icons/pen.svg",
+          "contextualTitle": "My Writing"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "writersStudio.library",
+        "contents": "Welcome. Let's set up a place for your writing.\n\n[Get started](command:writersStudio.runSetup)\n\nAlready have a folder of writing? [Choose that folder](command:writersStudio.chooseLibrary)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "writersStudio.runSetup",
+        "title": "Get started",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.openWalkthrough",
+        "title": "Show the getting started guide",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.setUpWritingLook",
+        "title": "Set up the writing look",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.restoreNormalLook",
+        "title": "Restore the normal VS Code look",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.chooseLibrary",
+        "title": "Change where my writing is kept",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.openLibrary",
+        "title": "Open my writing",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.newDraft",
+        "title": "New draft",
+        "category": "Writing",
+        "icon": "$(add)"
+      },
+      {
+        "command": "writersStudio.newDraftFromTemplate",
+        "title": "New draft from a template",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.refreshLibrary",
+        "title": "Refresh the list",
+        "category": "Writing",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "writersStudio.renameDocument",
+        "title": "Rename",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.duplicateDocument",
+        "title": "Duplicate",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.trashDocument",
+        "title": "Move to trash",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.putBackDocument",
+        "title": "Put back",
+        "category": "Writing",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "writersStudio.revealDocument",
+        "title": "Show where this file is saved",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.toggleFocusMode",
+        "title": "Turn focus mode on or off",
+        "category": "Writing",
+        "icon": "$(screen-full)"
+      },
+      {
+        "command": "writersStudio.addToDictionary",
+        "title": "Add this word to my dictionary",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.chooseSpelling",
+        "title": "Choose British or American spelling",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.copyAsHtml",
+        "title": "Copy for pasting into a website",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.copyAsPlainText",
+        "title": "Copy as plain text",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.exportAsWebPage",
+        "title": "Save as a web page",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.showPreview",
+        "title": "Show what this will look like",
+        "category": "Writing",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "writersStudio.showStatsDetail",
+        "title": "Show writing statistics",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.formatBold",
+        "title": "Bold",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.formatItalic",
+        "title": "Italic",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.formatLink",
+        "title": "Add a link",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.formatQuote",
+        "title": "Quote",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.formatBulletList",
+        "title": "Bullet list",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.formatNumberedList",
+        "title": "Numbered list",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.formatHeading",
+        "title": "Make this a heading",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.insertTable",
+        "title": "Insert a table",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.insertTableOfContents",
+        "title": "Insert a table of contents",
+        "category": "Writing"
+      },
+      {
+        "command": "writersStudio.showFormattingMenu",
+        "title": "Formatting…",
+        "category": "Writing",
+        "icon": "$(text-size)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "writersStudio.newDraft",
+          "when": "view == writersStudio.library",
+          "group": "navigation@1"
+        },
+        {
+          "command": "writersStudio.refreshLibrary",
+          "when": "view == writersStudio.library",
+          "group": "navigation@2"
+        },
+        {
+          "command": "writersStudio.newDraftFromTemplate",
+          "when": "view == writersStudio.library",
+          "group": "1_new@1"
+        },
+        {
+          "command": "writersStudio.chooseLibrary",
+          "when": "view == writersStudio.library",
+          "group": "9_settings@1"
+        },
+        {
+          "command": "writersStudio.restoreNormalLook",
+          "when": "view == writersStudio.library",
+          "group": "9_settings@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "writersStudio.renameDocument",
+          "when": "view == writersStudio.library && viewItem == writersStudio.document",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "writersStudio.duplicateDocument",
+          "when": "view == writersStudio.library && viewItem == writersStudio.document",
+          "group": "1_edit@2"
+        },
+        {
+          "command": "writersStudio.trashDocument",
+          "when": "view == writersStudio.library && viewItem == writersStudio.document",
+          "group": "2_delete@1"
+        },
+        {
+          "command": "writersStudio.revealDocument",
+          "when": "view == writersStudio.library && viewItem == writersStudio.document",
+          "group": "3_reveal@1"
+        },
+        {
+          "command": "writersStudio.putBackDocument",
+          "when": "view == writersStudio.library && viewItem == writersStudio.trashedDocument",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "writersStudio.putBackDocument",
+          "when": "view == writersStudio.library && viewItem == writersStudio.trashedDocument",
+          "group": "inline"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "writersStudio.showFormattingMenu",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown",
+          "group": "navigation@1"
+        },
+        {
+          "command": "writersStudio.toggleFocusMode",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown",
+          "group": "navigation@2"
+        },
+        {
+          "command": "writersStudio.showPreview",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "cSpell.suggestSpellingCorrections",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown && !editorReadonly && editorTextFocus && cSpell.editorMenuContext.showSuggestions",
+          "group": "navigation@0.1"
+        },
+        {
+          "command": "writersStudio.addToDictionary",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown",
+          "group": "navigation@0.2"
+        },
+        {
+          "command": "writersStudio.showFormattingMenu",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown",
+          "group": "navigation@0.3"
+        },
+        {
+          "command": "writersStudio.copyAsHtml",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown",
+          "group": "navigation@0.4"
+        },
+        {
+          "command": "writersStudio.copyAsPlainText",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown",
+          "group": "navigation@0.5"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "writersStudio.runSetup",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.renameDocument",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.duplicateDocument",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.trashDocument",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.putBackDocument",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.revealDocument",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.refreshLibrary",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.showStatsDetail",
+          "when": "false"
+        },
+        {
+          "command": "writersStudio.showFormattingMenu",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.formatBold",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.formatItalic",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.formatLink",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.formatQuote",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.formatBulletList",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.formatNumberedList",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.formatHeading",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.insertTable",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.insertTableOfContents",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.addToDictionary",
+          "when": "writersStudio.inWritingContext && editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.chooseSpelling",
+          "when": "writersStudio.inWritingContext"
+        },
+        {
+          "command": "writersStudio.copyAsHtml",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.copyAsPlainText",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.exportAsWebPage",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "writersStudio.showPreview",
+          "when": "editorLangId == markdown"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "writersStudio.formatBold",
+        "key": "ctrl+b",
+        "mac": "cmd+b",
+        "when": "writersStudio.inWritingContext && editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "comment": "Ctrl+B normally shows and hides the sidebar, which this takes over for Bold. The sidebar keeps a shortcut of its own so nothing is simply lost.",
+        "command": "workbench.action.toggleSidebarVisibility",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "writersStudio.inWritingContext"
+      },
+      {
+        "command": "writersStudio.formatItalic",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "when": "writersStudio.inWritingContext && editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "writersStudio.formatLink",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "writersStudio.inWritingContext && editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "writersStudio.newDraft",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "writersStudio.inWritingContext"
+      },
+      {
+        "command": "writersStudio.toggleFocusMode",
+        "key": "ctrl+alt+z",
+        "mac": "cmd+alt+z",
+        "when": "writersStudio.inWritingContext"
+      },
+      {
+        "command": "writersStudio.showFormattingMenu",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "writersStudio.inWritingContext && editorTextFocus && editorLangId == markdown"
+      }
+    ],
+    "configuration": {
+      "title": "Writer's Studio",
+      "properties": {
+        "writersStudio.wordsPerMinute": {
+          "type": "number",
+          "default": 200,
+          "minimum": 50,
+          "maximum": 1000,
+          "markdownDescription": "Reading speed used to estimate how long your piece takes to read."
+        },
+        "writersStudio.showStatusBarCount": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the word count and reading time at the bottom of the window."
+        },
+        "writersStudio.focus.dimParagraphs": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "In focus mode, fade every paragraph except the one you are writing in."
+        },
+        "writersStudio.focus.dimOpacity": {
+          "type": "number",
+          "default": 0.4,
+          "minimum": 0.05,
+          "maximum": 1,
+          "markdownDescription": "How faded the other paragraphs become in focus mode. Lower is fainter."
+        },
+        "writersStudio.focus.maxCharactersForDimming": {
+          "type": "number",
+          "default": 200000,
+          "minimum": 1000,
+          "markdownDescription": "Fading is switched off in documents longer than this, to keep typing fast."
+        },
+        "writersStudio.focus.typewriterLines": {
+          "type": "number",
+          "default": 12,
+          "minimum": 0,
+          "maximum": 40,
+          "markdownDescription": "How many lines of space to keep above and below the line you are writing on."
+        },
+        "writersStudio.focus.centerLayout": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Centre the text in the middle of the window in focus mode."
+        }
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "writersStudio.gettingStarted",
+        "title": "Start writing",
+        "description": "Four short steps and you are ready to write.",
+        "steps": [
+          {
+            "id": "library",
+            "title": "Choose where your writing is kept",
+            "description": "Pick one place for everything you write. You can change it later.\n[Choose a place](command:writersStudio.chooseLibrary)",
+            "media": {
+              "markdown": "media/walkthrough/library.md"
+            }
+          },
+          {
+            "id": "look",
+            "title": "Turn on the writing look",
+            "description": "This hides the parts of the window built for programmers and switches to a calm, readable page.\n[Set up the writing look](command:writersStudio.setUpWritingLook)",
+            "media": {
+              "markdown": "media/walkthrough/look.md"
+            }
+          },
+          {
+            "id": "draft",
+            "title": "Start your first piece",
+            "description": "A new, empty page with today's date.\n[New draft](command:writersStudio.newDraft)",
+            "media": {
+              "markdown": "media/walkthrough/draft.md"
+            }
+          },
+          {
+            "id": "shortcuts",
+            "title": "Learn three shortcuts",
+            "description": "Bold, italic, and focus mode are all you need to begin.",
+            "media": {
+              "markdown": "media/walkthrough/shortcuts.md"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run check && npm run bundle -- --minify",
+    "bundle": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "compile-tests": "tsc -p tsconfig.test.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "test": "npm run bundle && npm run compile-tests && vscode-test",
+    "check": "npm run typecheck && npm run lint",
+    "package": "vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.14.0",
+    "@types/vscode": "1.90.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.0",
+    "eslint": "^8.57.1",
+    "mocha": "^10.8.2",
+    "typescript": "^5.7.2"
+  }
+}
